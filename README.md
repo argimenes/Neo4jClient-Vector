@@ -89,6 +89,45 @@ public async Task<SearchCategoryGraph> SearchAsync(SearchCategoryGraph query)
 }
 ```
 
+Saving and updating entities has also been abstracted away, with optional Actions for inserting and updating the entity prior to committing:
+
+```c#
+public async Task<Result> SaveOrUpdateAsync(Category data)
+{
+    return await SaveOrUpdateAsync(data, update: x =>
+    {
+        x.Name = data.Name;
+        x.URICode = data.URICode;
+    });
+}
+```
+
+There are also a couple of ways of updating relationships. If you just want to create a relationship between existing nodes you can do so as follows:
+
+```c#
+public async Task<Result> BelongsToCalendarAsync(Guid calendarEventId, Guid calendarId)
+{
+    return await RelateAsync(new BelongsToCalendar
+    {
+        Source = new CalendarEvent { Guid = calendarEventId },
+        Target = new Calendar { Guid = calendarId }
+    });
+}
+```
+
+Or if you need to change a relationship from one node to a different node, you can do so using the `VectorIdent` class:
+
+```c#
+public async Task<Result> AtPlaceAsync(VectorIdent ident)
+{
+    if (ident.RelationId.HasValue)
+    {
+        await DeleteAsync<AtPlace>(ident);
+    }
+    return await RelateAsync<AtPlace>(ident);
+}
+```
+
 ## Coming soon
 
 - A breakdown of the core classes, and their built-in properties
