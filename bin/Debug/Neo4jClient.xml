@@ -1,0 +1,661 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Neo4jClient</name>
+    </assembly>
+    <members>
+        <member name="T:Neo4jClient.Execution.CypherExecutionPolicy">
+            <summary>
+            Describes the behavior for a cypher execution.
+            </summary>
+            <summary>
+            Describes the behavior for a cypher execution.
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Execution.EndpointBuilderExtension">
+            <summary>
+            Restricts the end point URI builder to adding paths
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Execution.IExecutionPolicyFactory">
+            <summary>
+            A factory class that returns a policy factory given the type and a <c>IGraphClient</c> connection.
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Execution.PolicyType">
+            <summary>
+            Possible enumerations of queries that a policy may represent
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.Neo4jTransaction">
+            <summary>
+            Implements the Neo4j HTTP transaction for multiple HTTP requests
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.Neo4jTransaction.Cancel">
+            <summary>
+            Cancels a transaction without closing it in the server
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.Neo4jTransaction.Commit">
+            <summary>
+            Commits our current transaction and closes the transaction.
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.Neo4jTransaction.Rollback">
+            <summary>
+            Rolls back our current transaction and closes the transaction.
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.Neo4jTransaction.KeepAlive">
+            <summary>
+            Emits an empty request to keep alive our current transaction.
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.Neo4jTransaction.ForceKeepAlive">
+            <summary>
+            Forces a keep alive, setting the endpoint if necessary
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.Neo4jTransaction.DoCommit(Neo4jClient.Transactions.ITransactionExecutionEnvironment,System.Collections.Specialized.NameValueCollection)">
+            <summary>
+            Commits a transaction given the ID
+            </summary>
+            <param name="transactionExecutionEnvironment">The transaction execution environment</param>
+            <param name="customHeaders">Custom headers to sent to the neo4j server</param>
+        </member>
+        <member name="M:Neo4jClient.Transactions.Neo4jTransaction.DoRollback(Neo4jClient.Transactions.ITransactionExecutionEnvironment,System.Collections.Specialized.NameValueCollection)">
+            <summary>
+            Rolls back a transaction given the ID
+            </summary>
+            <param name="transactionExecutionEnvironment">The transaction execution environment</param>
+        </member>
+        <member name="M:Neo4jClient.Transactions.Neo4jTransaction.DoKeepAlive(Neo4jClient.Transactions.ITransactionExecutionEnvironment)">
+            <summary>
+            Keeps alive a transaction given the ID
+            </summary>
+            <param name="transactionExecutionEnvironment">The transaction execution environment</param>
+        </member>
+        <member name="T:Neo4jClient.Transactions.Neo4jTransactionProxy">
+            <summary>
+            Implements the TransactionScopeProxy interfaces for INeo4jTransaction
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.Neo4jTransationSinglePhaseNotification">
+            <summary>
+            When <c>TransactionPromotableSinglePhaseNotification</c> fails to register as PSPE, then this class will
+            be registered, and all the necessary work will be done in here
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.TransactionContext">
+            <summary>
+            Encapsulates a transaction object with its transaction scheduler.
+            </summary>
+            <remarks>
+            All requests to the same transaction have to made sequentially. The purpose of this class is to ensure
+            that such calls are made in that fashion.
+            </remarks>
+        </member>
+        <member name="P:Neo4jClient.Transactions.TransactionContext.Transaction">
+            <summary>
+            The Neo4j transaction object.
+            </summary>
+        </member>
+        <member name="F:Neo4jClient.Transactions.TransactionContext._consumer">
+            <summary>
+            The consumer of all the tasks (a single thread)
+            </summary>
+        </member>
+        <member name="F:Neo4jClient.Transactions.TransactionContext._taskQueue">
+            <summary>
+            This is where the producer generates all the tasks
+            </summary>
+        </member>
+        <member name="F:Neo4jClient.Transactions.TransactionContext._cancellationTokenSource">
+            <summary>
+            Where the cancellation token generates
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.TransactionExecutionEnvironment">
+            <summary>
+            Because the resource manager is held in another application domain, the transaction execution environment
+            has to be serialized to cross app domain boundaries.
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.TransactionManager">
+            <summary>
+            Handles all the queries related to transactions that could be needed in a ITransactionalGraphClient
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.TransactionManager.BeginTransaction(Neo4jClient.Transactions.TransactionScopeOption)">
+            <summary>
+            Implements the internal part for ITransactionalGraphClient.BeginTransaction
+            </summary>
+            <param name="scopeOption">How should the transaction scope be created.
+            <see cref="M:Neo4jClient.Transactions.ITransactionalGraphClient.BeginTransaction(Neo4jClient.Transactions.TransactionScopeOption)" />
+             for more information.</param>
+            <returns></returns>
+        </member>
+        <member name="M:Neo4jClient.Transactions.TransactionManager.RegisterToTransactionIfNeeded">
+            <summary>
+            Registers to ambient System.Transactions.TransactionContext if needed
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.TransactionScopeProxy">
+            <summary>
+            Represents a TransactionContext scope within an ITransactionalManager. Encapsulates the real TransactionContext, so that in reality
+            it only exists one single TransactionContext object in a joined scope, but multiple TransactionScopeProxies that can be pushed, or
+            popped (in a scope context).
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.TransactionPromotableSinglePhaseNotification">
+            <summary>
+            This class manages the System.Transactions protocol in order to support TransactionScope bindings
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.IInternalTransactionalGraphClient">
+            <summary>
+            Exposes the same methods and members as ITransactionalGraphClient, however it is used
+            internally to access the ITransactionManager that the GraphClient uses.
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.INeo4jTransaction">
+            <summary>
+            Represents the same interface as <c>ITransaction</c>, however this interface is used
+            internally to manage the properties that requires interaction with the Neo4j HTTP interface
+            </summary>
+        </member>
+        <member name="P:Neo4jClient.Transactions.INeo4jTransaction.Endpoint">
+            <summary>
+            The Neo4j base endpoint for this transaction
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.ITransaction">
+            <summary>
+            Represents a Neo4j transaction shared between multiple HTTP requests
+            </summary>
+            <remarks>
+            Neo4j server prevents abandoned transactions from clogging server resources
+            by rolling back those that do not have requests in the configured timeout period.
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Transactions.ITransaction.Commit">
+            <summary>
+            Commits our open transaction.
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.ITransaction.Rollback">
+            <summary>
+            Rollbacks any changes made by our open transaction
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.ITransaction.KeepAlive">
+            <summary>
+            Prevents the transaction from being claimed as an orphaned transaction.
+            </summary>
+        </member>
+        <member name="P:Neo4jClient.Transactions.ITransaction.IsOpen">
+            <summary>
+            Returns true if the transaction is still open, that is, if the programmer has not called
+            Commit() or Rollback().
+            </summary>
+        </member>
+        <member name="P:Neo4jClient.Transactions.ITransaction.CustomHeaders">
+            <summary>
+            Customheader collection This will be the same for the entire transaction.
+            So the commit will use the same customheader(s) as the cypher customheader
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.TransactionScopeOption">
+            <summary>
+            Describes the options for a transaction scope when calling ITransactionalGraphClient.BeginTransaction
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.ITransactionalGraphClient">
+            <summary>
+            Expands the capabilities of a <c>IGraphClient</c> interface to support a transactional model 
+            for Neo4j HTTP Cypher endpoint.
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.ITransactionalGraphClient.BeginTransaction">
+            <summary>
+            Scopes the next cypher queries within a transaction, or joins an existing one.
+            </summary>
+            <remarks>
+            This method should only be used when executing multiple Cypher queries
+            in multiple HTTP requests. Neo4j already encapsulates a single Cypher request within its
+            own transaction.
+            
+            The transaction object created is thread static, that is, that the following queries will only be within
+            a transaction for the current thread.
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Transactions.ITransactionalGraphClient.BeginTransaction(Neo4jClient.Transactions.TransactionScopeOption)">
+            <summary>
+            Scopes the next cypher queries within a transaction (or supress it), according to a given scope option.
+            </summary>
+            <remarks>
+            This method should be used when executing multiple Cypher queries in multiple HTTP requests,
+            or when the thread is already under a transaction and the programmer wishes to temporarily supress it.
+            
+            It should not be called to execute a single Cypher query as it will only add latency to the process. Neo4j already encapsulates
+            a single Cypher request within its own transaction.
+            
+            Be aware that joining a nested transaction must be done before the parent scope completes either by committing or rolling back,
+            otherwise it will throw an InvalidOperationException.
+            
+            The transaction object created is thread static, that is, that the following queries will only be within
+            a transaction for the current thread.
+            </remarks>
+            <param name="scopeOption">
+            
+            <list type="bullet">
+                <item>
+                    <term>Join</term>
+                    <description>Creates a new transaction, or joins an existing one. This the default value.
+                    The transaction commits until all the scope that have a reference to it commit. However, the transaction rolls back 
+                    on the first call to Rollback().</description>
+                </item>
+                <item>
+                    <term>RequiresNew</term>
+                    <description>The method will generate a new transaction. It is important to notice that this new transaction is not
+            related to an existent parent transaction scope. Committing or rolling back either one has no effect on the other.
+                    </description>
+                </item>
+                <item>
+                    <term>Suppress</term>
+                    <description>The statements that are executed under this scope, will not be executed under the transaction.
+                    Committing or rolling back generates an <c>InvalidOperationException</c>. Creating a new transaction scope with Join under
+                    a suppressed one, will be the same as RequiresNew.</description>
+                </item>
+            </list>
+            </param>
+        </member>
+        <member name="P:Neo4jClient.Transactions.ITransactionalGraphClient.Transaction">
+            <summary>
+            The current transaction object.
+            </summary>
+            <remarks>
+            This object represents our current transactional scope. If it is not null, it doesn't that the code is executing under
+            a transaction. This latter behavior can occurred when BeginTransaction() is called with TransactionScopeOption.Suppress
+            </remarks>
+        </member>
+        <member name="P:Neo4jClient.Transactions.ITransactionalGraphClient.InTransaction">
+            <summary>
+            Determines if the code will be executed under a transaction.
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Transactions.ITransactionalGraphClient.EndTransaction">
+            <summary>
+            Closes the scope of a transaction. The <c>ITransaction</c> will behave as if it was being disposed.
+            </summary>
+        </member>
+        <member name="P:Neo4jClient.Transactions.ITransactionalGraphClient.TransactionEndpoint">
+            <summary>
+            The Neo4j transaction initial transaction endpoint
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.ITransactionManager">
+            <summary>
+            Interface that handles all the queries related to transactions that could be needed in a ITransactionalGraphClient
+            <see cref="T:Neo4jClient.Transactions.TransactionManager" /> for implementation.
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Transactions.TransactionHttpUtils">
+            <summary>
+            Contains utility methods for handling HttpResponseMessages in a transaction scope
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.ApiModels.Cypher.CypherStatementList">
+            <summary>
+            Represents the collection of Cypher statements that are going to be sent through a transaction.
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.ApiModels.Cypher.CypherTransactionStatement">
+            <summary>
+            Very similar to CypherApiQuery but it's used for opened transactions as their serialization
+            is different
+            </summary>
+        </member>
+        <member name="P:Neo4jClient.ApiModels.RootApiResponse.Version">
+            <summary>
+            Returns a structured representation of the Neo4j server version, but only with partial data.
+            The version type (milestone, preview, release candidate, stable) is not taken in to account,
+            so both 1.9.M01, 1.9.RC1 and 1.9.1 will all return 1.9.0.1.
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.CypherPartialResult">
+            <summary>
+            This class is only used to hold partial results on the execution of a cypher query.
+            Depending on whether we are running inside a transaction, the result string is already
+            deserialized (because it has to be checked for errors), or we need the full HttpResponseMessage
+            object.
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.Cypher.All">
+            <summary>
+            Represents a star in a Cypher function, so <code>All.Count()</code>
+            is equivalent to <code>count(*)</code>. Only for use in return expressions
+            like <code>.Return(() => new { Count = All.Count() })</code>, or start
+            expressions like <code>Start(new { n = All.Nodes })</code>, but not to be
+            called directly. (This class is just syntactic sugar for lambda expressions;
+            there is no .NET implementation of its methods.)
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.All.Count">
+            <summary>
+            Equivalent to <code>count(*)</code>
+            http://docs.neo4j.org/chunked/stable/query-aggregation.html#_count
+            </summary>
+        </member>
+        <member name="F:Neo4jClient.Cypher.All.Nodes">
+            <summary>
+            Equivalent to <code>node(*)</code>, for use in <code>START</code> clauses
+            such as <code>Start(new { n = All.Nodes })</code>
+            </summary>
+        </member>
+        <member name="P:Neo4jClient.Cypher.CypherCapabilities.SupportsStoredProcedures">
+            <summary>
+            Cypher 3.0 provides support for Stored Procedures via the CALL keyword.
+            </summary>
+        </member>
+        <member name="P:Neo4jClient.Cypher.CypherCapabilities.SupportsHasFunction">
+            <summary>
+            Cypher 3.0 no longer has the HAS() function, as it has been now superseded by EXISTS()
+            </summary>
+        </member>
+        <member name="F:Neo4jClient.Cypher.CypherPlanner.Rule">
+            <summary>The rule based planner (RULE)</summary>
+        </member>
+        <member name="F:Neo4jClient.Cypher.CypherPlanner.CostIdp">
+            <summary>The new cost based planner (IDP)</summary>
+        </member>
+        <member name="F:Neo4jClient.Cypher.CypherPlanner.CostGreedy">
+            <summary>The first cost based planner (COST)</summary>
+        </member>
+        <member name="P:Neo4jClient.Cypher.CypherQuery.CustomHeaders">
+            <summary>
+            Custom headers to add to REST calls to Neo4j server.
+            Example usage: This can be used to provide extra information to a Neo4j Loadbalancer. 
+            </summary>
+        </member>
+        <member name="F:Neo4jClient.Cypher.CypherResultMode.Set">
+            <summary>
+            In this mode, we expect the Cypher table to contain a single column. When deserializing it,
+            instead of giving the developer a list of one-column rows, we'll just give them a list of objects.
+            Effectively, we unwrap the column into a straight up array of entries. This is done to make the
+            syntax a little nicer when a developer wants to return a single identity and not a full table.
+            </summary>
+        </member>
+        <member name="F:Neo4jClient.Cypher.CypherResultMode.Projection">
+            <summary>
+            This is the default mode, and tells the serializer to treat each row as one object to deserialize.
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.CypherReturnExpressionBuilder.BuildText(System.Linq.Expressions.MemberInitExpression,Neo4jClient.Cypher.CypherCapabilities,System.Collections.Generic.IEnumerable{Newtonsoft.Json.JsonConverter},System.Boolean)">
+            <remarks>
+            This build method caters to object initializers, like:
+            
+                new MyType { Foo = "Bar", Baz = "Qak" }
+            
+            It does not however cater to anonymous types, as they don't compile
+            down to traditional object initializers.
+            
+            <see cref="!:BuildText(NewExpression, CypherCapabilities, IEnumerable&lt;JsonConverter&gt;)"/> caters to anonymous types.
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Cypher.CypherReturnExpressionBuilder.BuildText(System.Linq.Expressions.NewExpression,Neo4jClient.Cypher.CypherCapabilities,System.Collections.Generic.IEnumerable{Newtonsoft.Json.JsonConverter},System.Boolean)">
+            <remarks>
+            This C#:
+            
+                new { Foo = "Bar", Baz = "Qak" }
+            
+            translates to:
+            
+                new __SomeAnonymousType("Bar", "Qak")
+            
+            which is then a NewExpression rather than a MemberInitExpression.
+            
+            This is the scenario that this build method caters for.
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Cypher.CypherReturnExpressionBuilder.BuildText(System.Linq.Expressions.MethodCallExpression,Neo4jClient.Cypher.CypherCapabilities,System.Collections.Generic.IEnumerable{Newtonsoft.Json.JsonConverter})">
+            <remarks>
+            This build method caters to expressions like: <code>item => item.Count()</code>
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Cypher.CypherReturnExpressionBuilder.BuildText(System.Linq.Expressions.MemberExpression,Neo4jClient.Cypher.CypherCapabilities,System.Collections.Generic.IEnumerable{Newtonsoft.Json.JsonConverter},System.Boolean)">
+            <remarks>
+            This build method caters to expressions like: <code>item => item.As&lt;Foo&gt;().Bar</code>
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Cypher.CypherWithExpressionBuilder.BuildText(System.Linq.Expressions.MemberInitExpression)">
+            <remarks>
+            This build method caters to object initializers, like:
+            
+                new MyType { Foo = "Bar", Baz = "Qak" }
+            
+            It does not however cater to anonymous types, as they don't compile
+            down to traditional object initializers.
+            
+            <see cref="M:Neo4jClient.Cypher.CypherWithExpressionBuilder.BuildText(System.Linq.Expressions.NewExpression)"/> caters to anonymous types.
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Cypher.CypherWithExpressionBuilder.BuildText(System.Linq.Expressions.NewExpression)">
+            <remarks>
+            This C#:
+            
+                new { Foo = "Bar", Baz = "Qak" }
+            
+            translates to:
+            
+                new __SomeAnonymousType("Bar", "Qak")
+            
+            which is then a NewExpression rather than a MemberInitExpression.
+            
+            This is the scenario that this build method caters for.
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Cypher.CypherWithExpressionBuilder.BuildText(System.Linq.Expressions.MethodCallExpression)">
+            <remarks>
+            This build method caters to expressions like: <code>item => item.Count()</code>
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Cypher.CypherWithExpressionBuilder.BuildText(System.Linq.Expressions.MemberExpression)">
+            <remarks>
+            This build method caters to expressions like: <code>item => item.As&lt;Foo&gt;().Bar</code>
+            </remarks>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherFluentQuery.CustomHeaders(System.Collections.Specialized.NameValueCollection)">
+            <summary>
+            Custom headers to add to REST calls to Neo4j server.
+            Example usage: This can be used to provide extra information to a Neo4j Loadbalancer.
+            </summary>
+            <remarks>
+            This settings is ignored when using <see cref="M:Neo4jClient.IRawGraphClient.ExecuteMultipleCypherQueriesInTransaction(System.Collections.Generic.IEnumerable{Neo4jClient.Cypher.CypherQuery},System.Collections.Specialized.NameValueCollection)"/>
+            Since it could create a race-condition.
+            </remarks>
+            <param name="headers">Customheader added via: <see cref="T:System.Collections.Specialized.NameValueCollection"/></param>
+            <returns></returns>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherFluentQuery.Call(System.String)">
+            <summary>
+            [Neo4j 3.0+] Calls a Stored Procedure on the Database.
+            </summary>
+            <remarks>This only works on Neo4j 3.0+</remarks>
+            <param name="storedProcedureText">The Stored Procedure to execute.</param>
+            <returns>An <see cref="T:Neo4jClient.Cypher.ICypherFluentQuery"/> instance to continue the query with.</returns>
+            <exception cref="T:System.ArgumentException">Thrown if the <paramref name="storedProcedureText"/> argument is empty or null.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown if an attempt is made to call this against a server version prior to 3.0.</exception>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherFluentQuery.Yield(System.String)">
+            <summary>
+            [Neo4j 3.0+] Yields the values from the response of a <see cref="M:Neo4jClient.Cypher.ICypherFluentQuery.Call(System.String)"/> method
+            </summary>
+            <remarks>This only works on Neo4j 3.0+</remarks>
+            <param name="yieldText">The values to yield.</param>
+            <returns>An <see cref="T:Neo4jClient.Cypher.ICypherFluentQuery"/> instance to continue the query with.</returns>
+            <exception cref="T:System.ArgumentException">Thrown if the <paramref name="yieldText"/> argument is empty or null.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown if an attempt is made to call this against a server version prior to 3.0.</exception>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherFluentQuery.LoadCsv(System.Uri,System.String,System.Boolean,System.String,System.Nullable{System.Int32})">
+            <summary>Load a CSV into Neo4j.</summary>
+            <remarks>This creates the following: <c>LOAD CSV FROM 'fileUri' AS identifier</c></remarks>
+            <param name="fileUri">The file URI in the format: <c>c:\\example.csv.</c></param>
+            <param name="identifier">The identifier to use in the rest of the query.</param>
+            <param name="withHeaders">Use this custom headers are defined in the CSV file</param>
+            <param name="fieldTerminator">The terminator to use. If you do not define anything the Neo4j default will be used: ','</param>
+            <param name="periodicCommit">If this is <c>null</c> no periodic commit will be used, otherwise PERIODIC COMMIT will be added with the value set.</param>
+            <returns>An <see cref="T:Neo4jClient.Cypher.ICypherFluentQuery"/> instance to continue the query with.</returns>
+        </member>
+        <member name="T:Neo4jClient.Cypher.ICypherFluentQueryAdvanced">
+            <summary>
+            Exposes low level return api to allow more control when developing libraries on top of Neo4jClient
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.As``1">
+            <summary>
+            Does not emit anything into the query; purely used for design-time type coersion in C#
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.Node``1">
+            <summary>
+            DO NOT USE IN NEW CODE.
+            Shortcut for As&lt;Node&lt;T&gt;&gt;.
+            The general trend in both Neo4j and Cypher is moving way from returning node references. Use As&lt;T&gt; instead to return the information you need, without the metadata of the node. For future queries, use indexes, match expressions and well-known domain-specific data to locate the node you need rather than passing in a reference to it. (In the Neo4j 2.0 timeframe, even the START clause is starting to be deprecated in favour of MATCH and WHERE.) For updating or deleting nodes, start to use mutable Cypher instead. Clauses likE CREATE, SET and DELETE will let you do more in the same query, rather than sending extra HTTP calls over the wire for each action.
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.CollectAs``1">
+            <summary>
+            Equivalent to <code>RETURN collect(foo)</code>
+            http://docs.neo4j.org/chunked/stable/query-aggregation.html#aggregation-collect
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.CollectAsDistinct``1">
+            <summary>
+            Equivalent to <code>RETURN collect(distinct foo)</code>
+            http://docs.neo4j.org/chunked/stable/query-aggregation.html#aggregation-collect
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.Head">
+            <summary>
+            Equivalent to <code>RETURN head()</code>
+            http://docs.neo4j.org/chunked/stable/query-functions-scalar.html#functions-head
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.Last">
+            <summary>
+            Equivalent to <code>RETURN last()</code>
+            http://docs.neo4j.org/chunked/stable/query-functions-scalar.html#functions-last
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.Count">
+            <summary>
+            Equivalent to <code>RETURN count(foo)</code>
+            http://docs.neo4j.org/chunked/stable/query-aggregation.html#_count
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.CountDistinct">
+            <summary>
+            Equivalent to <code>RETURN count(distinct foo)</code>
+            http://docs.neo4j.org/chunked/stable/query-aggregation.html#_count
+            http://docs.neo4j.org/chunked/stable/query-aggregation.html#aggregation-distinct
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.Length">
+            <summary>
+            Equivalent to <code>RETURN length(foo)</code>
+            http://docs.neo4j.org/chunked/stable/query-function.html#functions-length
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.Type">
+            <summary>
+            Equivalent to <code>RETURN type(foo)</code>
+            http://docs.neo4j.org/chunked/stable/query-function.html#functions-type
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.Id">
+            <summary>
+            Equivalent to <code>RETURN id(foo)</code>
+            http://docs.neo4j.org/chunked/stable/query-function.html#functions-id
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.ICypherResultItem.Labels">
+            <summary>
+            Equivalent to <code>RETURN labels(foo)</code>
+            http://docs.neo4j.org/chunked/preview/query-functions-collection.html#functions-labels
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.Node.ByIndexLookup(System.String,System.String,System.Object)">
+            <summary>
+            Used for Cypher <code>START</code> clauses, like <code>Start(new { foo = Node.ByIndexLookup(…) })</code>
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.Node.ByIndexQuery(System.String,System.String)">
+            <summary>
+            Used for Cypher <code>START</code> clauses, like <code>Start(new { foo = Node.ByIndexQuery(…) })</code>
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Cypher.Return.As``1(System.String)">
+            <summary>
+            Used for Cypher <code>RETURN</code> clauses, like <code>Return(() => new { Foo = Return.As&lt;string&gt;("weird_func(foo).wow") })</code>
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Relationship.ByIndexLookup(System.String,System.String,System.Object)">
+            <summary>
+            Used for Cypher <code>START</code> clauses, like <code>Start(new { foo = Relationship.ByIndexLookup(…) })</code>
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Relationship.ByIndexQuery(System.String,System.String)">
+            <summary>
+            Used for Cypher <code>START</code> clauses, like <code>Start(new { foo = Relationship.ByIndexQuery(…) })</code>
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.Extensions.MemberInfoExtensions.GetNameUsingJsonProperty(System.Reflection.MemberInfo)">
+            <summary>Gets the name of the property, if a <see cref="T:Newtonsoft.Json.JsonPropertyAttribute"/> is attached, it will attempt to use that first, then if a <see cref="T:Newtonsoft.Json.JsonObjectAttribute"/> is attached it will use the <see cref="T:Newtonsoft.Json.Serialization.NamingStrategy"/> next.</summary>
+            <param name="info">The <see cref="T:System.Reflection.MemberInfo"/> to get the name from</param>
+            <returns>The name of the property, if a <see cref="T:Newtonsoft.Json.JsonPropertyAttribute"/> is attached, it will use that first, then if a <see cref="T:Newtonsoft.Json.JsonObjectAttribute"/> is attached it will use the <see cref="T:Newtonsoft.Json.Serialization.NamingStrategy"/> next.</returns>
+        </member>
+        <member name="M:Neo4jClient.IGraphClient.Create``1(``0,System.Collections.Generic.IEnumerable{Neo4jClient.IRelationshipAllowingParticipantNode{``0}},System.Collections.Generic.IEnumerable{Neo4jClient.IndexEntry})">
+            <summary>
+            Creates a node, relationships and index entries all in a single HTTP call (which also means a single transaction).
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.IGraphClient.Update``1(Neo4jClient.NodeReference{``0},``0,System.Collections.Generic.IEnumerable{Neo4jClient.IndexEntry})">
+            <summary>
+            Retrieves the specified node, gives you an opportunity to mutate it in the callback, then persists the final object back to Neo4j. Results in two calls over the wire: one to retrieve, one to set.
+            </summary>
+            <typeparam name="TNode">POCO type that represents the structure of the node's data</typeparam>
+            <param name="nodeReference">The node to retrieve and update</param>
+            <param name="replacementData">Data to replace the node with</param>
+            <param name="indexEntries">New index entries that should also be persisted</param>
+        </member>
+        <member name="M:Neo4jClient.IGraphClient.Update``1(Neo4jClient.NodeReference{``0},System.Action{``0},System.Func{``0,System.Collections.Generic.IEnumerable{Neo4jClient.IndexEntry}},System.Action{System.Collections.Generic.IEnumerable{Neo4jClient.ApiModels.FieldChange}})">
+            <summary>
+            Retrieves the specified node, gives you an opportunity to mutate it in the callback, then persists the final object back to Neo4j. Results in two calls over the wire: one to retrieve, one to set.
+            </summary>
+            <typeparam name="TNode">POCO type that represents the structure of the node's data</typeparam>
+            <param name="nodeReference">The node to retrieve and update</param>
+            <param name="updateCallback">A callback to mutate the values between retrieval and persistence</param>
+            <param name="indexEntriesCallback">A callback to return new index entries that should also be persisted</param>
+            <param name="changeCallback">A callback to respond to the resulting property changes</param>
+        </member>
+        <member name="M:Neo4jClient.IGraphClient.DeleteIndexEntries(System.String,Neo4jClient.NodeReference)">
+            <summary>
+            Delete all index entries for specified node
+            </summary>
+        </member>
+        <member name="M:Neo4jClient.IGraphClient.DeleteIndexEntries(System.String,Neo4jClient.RelationshipReference)">
+            <summary>
+            Delete all index entries for specified relationship
+            </summary>
+        </member>
+        <member name="T:Neo4jClient.IRawGraphClient">
+            <summary>
+            These are signatures that our <see cref="T:Neo4jClient.GraphClient"/> exposes to
+            support things like our Cypher infrastructure, but we don't want
+            people to call directly. (Because there are nicer ways to do it.)
+            </summary>
+        </member>
+    </members>
+</doc>
