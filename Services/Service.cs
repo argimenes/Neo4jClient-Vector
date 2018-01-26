@@ -14,11 +14,19 @@ using Neo4jClientVector.Relationships;
 using Neo4jClientVector.Contexts;
 using Neo4jClientVector.Helpers;
 using Neo4jClientVector.Attributes;
+using Neo4jClientVector.Constants.Enums;
+using System.Reflection;
 
 namespace Neo4jClientVector.Core.Services
 {
     public interface IService
     {
+        Task<Result> DeleteAsync<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, bool replace = false)
+            where TRel : Relation, new()
+            where TSource : Entity
+            where TTarget : Entity;
+        Task<TVector> FindVectorAsync<TVector>(Guid relationId) where TVector : Vector;
+        Task<Result> SaveOrUpdateInsideScopeAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Entity, new();
         bool NArity(Type vectorType, string sourceGuid, string targetGuid);
         Task<Result> UpdateAsync<TEntity>(Guid guid, Action<TEntity> update = null) where TEntity : Entity, new();
         Task<Result> SaveOrUpdateAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Entity, new();
@@ -34,7 +42,7 @@ namespace Neo4jClientVector.Core.Services
     public class Service : IService, IDisposable
     {
         #region constructor
-        protected readonly ILog Log = LogManager.GetLogger(typeof(Service).Name);
+        protected readonly ILog Log = LogManager.GetLogger("Default");
         protected readonly ICypherFluentQuery graph;
         protected readonly IGraphDataContext db;
         public Service(IGraphDataContext _db)
@@ -44,17 +52,84 @@ namespace Neo4jClientVector.Core.Services
         }
         #endregion
 
+        protected string Direction(Search search, string ascending, string descending)
+        {
+            return search.Direction == SearchDirection.Ascending ? ascending : descending;
+        }
+
+        protected string Key<TEntity>() where TEntity : Entity
+        {
+            return Common.GraphNodeKey<TEntity>();
+        }
+
         public static string Collect<TVector>() where TVector : Vector
         {
             return Collect<TVector>(null);
         }
 
-        protected static string Collect<TVector>(string target) where TVector : Vector
+        protected static string Collect<TVector>(string targetKey) where TVector : Vector
+        {
+            return "collect(distinct " + Edge<TVector>(targetKey) + ")";
+        }
+
+        protected static string Rows<TVector>() where TVector : Vector
+        {
+            return Rows<TVector>(null);
+        }
+
+        protected static string Rows<TVector>(string targetKey) where TVector : Vector
         {
             var type = Common.Unpack<TVector>();
-            var RK = Common.GraphRelationshipKey(type.Relation);
-            var TK = target ?? Common.GraphNodeKey(type.Target);
-            return "collect(distinct { Relation: " + RK + ", Target: " + TK + " })";
+            var SK = type.Source.NodeKey();
+            var RK = type.Relation.RelationshipKey();
+            var TK = targetKey ?? type.Target.NodeKey();
+            var pattern = Common.Vector<TVector>(fromLabel: false, from: SK, to: TK);
+            return "[ " + pattern + " | { Source: " + SK + ", Relation: " + RK + ", Target: " + TK + " } ]";
+        }
+
+        protected static string Rows<TVector>(string sourceKey, string targetKey) where TVector : Vector
+        {
+            var type = Common.Unpack<TVector>();
+            var SK = sourceKey ?? type.Source.NodeKey();
+            var RK = type.Relation.RelationshipKey();
+            var TK = targetKey ?? type.Target.NodeKey();
+            var pattern = Common.Vector<TVector>(fromLabel: false, from: SK, to: TK);
+            return "[ " + pattern + " | { Source: " + SK + ", Relation: " + RK + ", Target: " + TK + " } ]";
+        }
+
+        protected static string Single<TVector>() where TVector : Vector
+        {
+            return Single<TVector>(null);
+        }
+
+        protected static string Single<TVector>(string sourceKey, string targetKey) where TVector : Vector
+        {
+            // return "head(" + Rows<TVector>(sourceKey, targetKey) + ")";
+            return Rows<TVector>(sourceKey, targetKey) + "[0]";
+        }
+
+        protected static string Single<TVector>(string targetKey) where TVector : Vector
+        {
+            // return "head(" + Rows<TVector>(targetKey) + ")";
+            return Rows<TVector>(targetKey) + "[0]";
+        }
+
+        protected static string Edge<TVector>(string targetKey) where TVector : Vector
+        {
+            var type = Common.Unpack<TVector>();
+            var RK = type.Relation.RelationshipKey();
+            var TK = targetKey ?? type.Target.NodeKey();
+            return "{ Relation: " + RK + ", Target: " + TK + " }";
+        }
+
+        protected static string Edge<TVector>() where TVector : Vector
+        {
+            return Edge<TVector>(null);
+        }
+
+        protected static string Head<TVector>() where TVector : Vector
+        {
+            return "head(" + Collect<TVector>(null) + ")";
         }
 
         protected static string Head<TVector>(string target) where TVector : Vector
@@ -72,7 +147,7 @@ namespace Neo4jClientVector.Core.Services
         public bool NArity(Type specificVectorType, string sourceGuid, string targetGuid)
         {
             var type = Common.Unpack(specificVectorType);
-            var relationAttribute = Attribute.GetCustomAttribute(type.Relation, typeof(GraphRelationshipAttribute)) as GraphRelationshipAttribute;
+            var relationAttribute = Attribute.GetCustomAttribute(type.Relation, typeof(RelationshipAttribute)) as RelationshipAttribute;
             if (relationAttribute.SameNodeMultipleAllowed)
             {
                 return true;
@@ -83,10 +158,24 @@ namespace Neo4jClientVector.Core.Services
             return total >= 1;
         }
 
+        protected string CreateUniquePattern<TVector>(string sourceKey, string relationKey, string targetKey) where TVector : Vector
+        {
+            var type = Common.Unpack<TVector>();
+            var relationAttribute = Attribute.GetCustomAttribute(type.Relation, typeof(RelationshipAttribute)) as RelationshipAttribute;
+            if (relationAttribute.Direction == RelationshipDirection.Outgoing)
+            {
+                return "(" + sourceKey + " )-[" + relationKey + ":" + relationAttribute.Type + " {relationship}]->(" + targetKey + ")";
+            }
+            else
+            {
+                return "(" + sourceKey + ")<-[" + relationKey + ":" + relationAttribute.Type + " {relationship}]-(" + targetKey + ")";
+            }
+        }
+
         protected string VectorPattern<TVector>() where TVector : Vector
         {
             var type = Common.Unpack<TVector>();
-            var relationAttribute = Attribute.GetCustomAttribute(type.Relation, typeof(GraphRelationshipAttribute)) as GraphRelationshipAttribute;
+            var relationAttribute = Attribute.GetCustomAttribute(type.Relation, typeof(RelationshipAttribute)) as RelationshipAttribute;
             var S = N(type.Source);
             var T = N(type.Target);
             if (relationAttribute.Direction == RelationshipDirection.Outgoing)
@@ -103,7 +192,7 @@ namespace Neo4jClientVector.Core.Services
         {
             var S = N(vectorType.Source);
             var T = N(vectorType.Target);
-            var relationAttribute = Attribute.GetCustomAttribute(vectorType.Relation, typeof(GraphRelationshipAttribute)) as GraphRelationshipAttribute;
+            var relationAttribute = Attribute.GetCustomAttribute(vectorType.Relation, typeof(RelationshipAttribute)) as RelationshipAttribute;
             if (relationAttribute.Direction == RelationshipDirection.Outgoing)
             {
                 return "(:" + S + " { Guid: {sourceGuid} })-[r:" + relationAttribute.Type + "]->(:" + T + " { Guid: {targetGuid} })";
@@ -118,7 +207,7 @@ namespace Neo4jClientVector.Core.Services
         {
             var S = N(vectorType.Source);
             var T = N(vectorType.Target);
-            var attribute = Attribute.GetCustomAttribute(vectorType.Relation, typeof(GraphRelationshipAttribute)) as GraphRelationshipAttribute;
+            var attribute = Attribute.GetCustomAttribute(vectorType.Relation, typeof(RelationshipAttribute)) as RelationshipAttribute;
             if (attribute.Direction == RelationshipDirection.Outgoing)
             {
                 return "(:" + S + " { Guid: {sourceGuid} })-[r:" + attribute.Type + "]->(:" + T + " { Guid: {targetGuid} })";
@@ -129,7 +218,7 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        string VectorPattern(GraphRelationshipAttribute attribute, Type sourceType, string sourceGuid, Type targetType, string targetGuid)
+        string VectorPattern(RelationshipAttribute attribute, Type sourceType, string sourceGuid, Type targetType, string targetGuid)
         {
             var S = N(sourceType);
             var T = N(targetType);
@@ -143,22 +232,34 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        protected virtual ICypherFluentQuery Match<T>(string name = null) where T : Entity
+        protected virtual ICypherFluentQuery FromCode<T>(string code = null, string key = null) where T : Entity
         {
-            name = name ?? Common.GraphNodeKey<T>();
-            return graph.Match($"({name}:{N<T>()})");
+            key = key ?? Common.GraphNodeKey<T>();
+            var query = graph.Match($"({key}:{N<T>()})");
+            if (code.HasValue())
+            {
+                query = query.Where($"{key}.Code = '{code}'");
+            }
+            return query;
+        }
+
+        protected virtual ICypherFluentQuery From<T>(string key = null) where T : Entity
+        {
+            key = key ?? Common.GraphNodeKey<T>();
+            return graph.Match($"({key}:{N<T>()})");
         }
 
         protected async Task<TSearch> PageAsync<TEntity, TSearch>(
             Search<TEntity> query,
             ICypherFluentQuery records,
             Expression<Func<ICypherResultItem, TEntity>> selector = null,
-            string orderBy = null,
-            string startNode = "x")
+            OrderBy orderBy = null,
+            string startNode = null)
 
             where TEntity : class
             where TSearch : Search<TEntity>, new()
         {
+            startNode = startNode ?? SearchEntityNodeKey<TEntity>();
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             query.Count = (int)(await records.CountAsync(startNode));
@@ -178,12 +279,48 @@ namespace Neo4jClientVector.Core.Services
             }
             if (selector == null)
             {
-                selector = x => x.As<TEntity>();
+                selector = As<TEntity>(startNode);
             }
-            query.Results = await records.ToListAsync(selector, orderBy: orderBy);
+            var orderByValue = (orderBy != null ? orderBy.Render() : null);
+            query.Results = await records.ToListAsync(selector, orderBy: orderByValue);
             stopwatch.Stop();
             query.ElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
             return query.Downcast<TSearch>();
+        }
+
+        static string SearchEntityNodeKey<TEntity>() where TEntity : class
+        {
+            var type = typeof(TEntity);
+            var parentType = type.UnderlyingSystemType.BaseType;
+            if (parentType.BaseType == typeof(Graph))
+            {
+                var graphArgs = parentType.GetTypeInfo().GenericTypeArguments;
+                type = graphArgs[0];
+            }
+            if (parentType.BaseType == typeof(Cluster))
+            {
+                var clusterArgs = parentType.GetTypeInfo().GenericTypeArguments;
+                type = clusterArgs[0];
+            }
+            return Common.NodeKey(type);
+        }
+
+        /// <summary>
+        /// Returns a lambda expression that allows the <paramref name="startNode"/> value to be used dynamically in the Return.As cast.
+        /// </summary>
+        /// <typeparam name="TEntity"></typeparam>
+        /// <param name="startNode"></param>
+        /// <returns></returns>
+        static Expression<Func<ICypherResultItem, TEntity>> As<TEntity>(string startNode) where TEntity : class
+        {
+            return LambdaGenericMethodCall<ICypherResultItem, TEntity>(startNode, "As");
+        }
+
+        protected static Expression<Func<TTarget, TEntity>> LambdaGenericMethodCall<TTarget, TEntity>(string lambdaParameter, string methodName) where TEntity : class
+        {
+            var parameter = Expression.Parameter(typeof(TTarget), lambdaParameter);
+            var callee = Expression.Call(parameter, typeof(TTarget).GetGenericMethod<TEntity>(methodName));
+            return Expression.Lambda<Func<TTarget, TEntity>>(callee, parameter);
         }
 
         public async Task<List<T>> AllAsync<T>(string orderBy = null) where T : Entity
@@ -192,16 +329,16 @@ namespace Neo4jClientVector.Core.Services
                               .ToListAsync(x => x.As<T>(), orderBy);
         }
 
-        TransactionScope NewScope()
+        protected TransactionScope NewScope()
         {
             return new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
         }
 
-        public async Task<Result> SaveAsync<TEntity>(Guid? guid, TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null, string instanceName = null) where TEntity : Entity
+        public async Task<Result> SaveAsync<TEntity>(Guid? guid, TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Entity
         {
-            try
+            using (var scope = NewScope())
             {
-                using (var scope = NewScope())
+                try
                 {
                     if (entity.Guid == Guid.Empty)
                     {
@@ -223,18 +360,22 @@ namespace Neo4jClientVector.Core.Services
                         .OnCreate().Set("entity = {entity}")
                         .OnMatch().Set("entity = {entity}")
                         .WithParams(new { guid = entity.Guid, entity });
-                    await query.ExecuteWithoutResultsAsync();                    
+                    await query.ExecuteWithoutResultsAsync();
                     scope.Complete();
+                    return Success();
                 }
-                return Success();
-            }
-            catch (NeoException ex)
-            {
-                return Error(new { entity }, ex);
-            }
-            catch (Exception ex)
-            {
-                return Error(new { entity }, ex);
+                catch (NeoException ex)
+                {
+                    return Error(new { entity }, ex);
+                }
+                catch (Exception ex)
+                {
+                    return Error(new { entity }, ex);
+                }
+                finally
+                {
+                    scope.Dispose();
+                }
             }
         }
 
@@ -266,7 +407,7 @@ namespace Neo4jClientVector.Core.Services
 
         public string N(Type type)
         {
-            return Common.NodeLabel(type);
+            return type.Label();
         }
 
         /// <summary>
@@ -293,33 +434,50 @@ namespace Neo4jClientVector.Core.Services
         {
             using (var scope = NewScope())
             {
-                if (entity.Guid == Guid.Empty)
+                try
                 {
-                    entity.Guid = Guid.NewGuid();
-                    entity.DateAddedUTC = DateTime.UtcNow;
-                    if (insert != null)
-                    {
-                        insert(entity);
-                    }
+                    var save = await SaveOrUpdateInsideScopeAsync(entity, insert, update);
+                    scope.Complete();
+                    return save;
                 }
-                else
+                catch (Exception ex)
                 {
-                    var existing = await FindAsync<TEntity>(entity.Guid);
-                    if (existing == null)
-                    {
-                        return NotFound(new { label = N<TEntity>(), guid = entity.Guid });
-                    }
-                    existing.DateModifiedUTC = DateTime.UtcNow;
-                    if (update != null)
-                    {
-                        update(existing);
-                    }
-                    entity = existing;
+                    return Error(ex);
                 }
-                var save = await SaveAsync(entity);                
-                scope.Complete();
-                return save;
+                finally
+                {
+                    scope.Dispose();
+                }
             }
+        }
+
+        public async Task<Result> SaveOrUpdateInsideScopeAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Entity, new()
+        {
+            if (entity.Guid == Guid.Empty)
+            {
+                entity.Guid = Guid.NewGuid();
+                entity.DateAddedUTC = DateTime.UtcNow;
+                if (insert != null)
+                {
+                    insert(entity);
+                }
+            }
+            else
+            {
+                var existing = await FindAsync<TEntity>(entity.Guid);
+                if (existing == null)
+                {
+                    return NotFound(new { label = N<TEntity>(), guid = entity.Guid });
+                }
+                existing.DateModifiedUTC = DateTime.UtcNow;
+                if (update != null)
+                {
+                    update(existing);
+                }
+                entity = existing;
+            }
+            var save = await SaveAsync(entity);
+            return save;
         }
 
         public async Task<Result> SaveAsync<TEntity>(TEntity entity) where TEntity : Entity
@@ -348,7 +506,7 @@ namespace Neo4jClientVector.Core.Services
             try
             {
                 string pattern = "";
-                var attr = Common.Attribute<GraphRelationshipAttribute>(typeof(TRel));
+                var attr = Common.Attribute<RelationshipAttribute>(typeof(TRel));
                 if (attr.Direction == RelationshipDirection.Outgoing)
                 {
                     pattern = $"(x:{N<TSource>()})-[r:{R<TRel>()}]->(y:{N<TTarget>()})";
@@ -357,18 +515,18 @@ namespace Neo4jClientVector.Core.Services
                 {
                     pattern = $"(x:{N<TSource>()})<-[r:{R<TRel>()}]-(y:{N<TTarget>()})";
                 }
-                var query = graph.Match(pattern).WhereStart();
+                var query = graph.Match(pattern).Where();
                 if (vector.Source.__(x => x.Guid != Guid.Empty))
                 {
-                    query = query.AndWhere((IIdentifiable x) => x.Guid == vector.Source.Guid);
+                    query = query.AndWhere((IGuid x) => x.Guid == vector.Source.Guid);
                 }
                 if (vector.Target.__(x => x.Guid != Guid.Empty))
                 {
-                    query = query.AndWhere((IIdentifiable y) => y.Guid == vector.Target.Guid);
+                    query = query.AndWhere((IGuid y) => y.Guid == vector.Target.Guid);
                 }
                 if (vector.Relation.__(x => x.Guid.HasValue))
                 {
-                    query = query.AndWhere((IIdentifiable r) => r.Guid == vector.Relation.Guid);
+                    query = query.AndWhere((IGuid r) => r.Guid == vector.Relation.Guid);
                 }
                 await query.Delete("r")
                            .ExecuteWithoutResultsAsync();
@@ -381,14 +539,13 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        public async Task<VectorIdent> FindVectorIdentAsync<TVector>(Guid relationId) where TVector : Vector
-
+        public async Task<TVector> FindVectorAsync<TVector>(Guid relationId) where TVector : Vector
         {
             var vectorType = Common.Unpack<TVector>();
             var R = this.R(vectorType.Relation);
             var S = N(vectorType.Source);
             var T = N(vectorType.Target);
-            var relationshipAttribute = Common.Attribute<GraphRelationshipAttribute>(vectorType.Relation);
+            var relationshipAttribute = Common.Attribute<RelationshipAttribute>(vectorType.Relation);
             string pattern = "";
             if (relationshipAttribute.Direction == RelationshipDirection.Outgoing)
             {
@@ -398,7 +555,28 @@ namespace Neo4jClientVector.Core.Services
             {
                 pattern = $"(x:{S})<-[r:{R}]-(y:{T})";
             }
-            var query = graph.Match(pattern).Where((IIdentifiable r) => r.Guid == relationId);
+            var query = graph.Match(pattern).Where((IGuid r) => r.Guid == relationId);
+            var result = await query.FirstOrDefaultAsync(() => Return.As<TVector>("{ Source: x, Relation: r, Target: y }"));
+            return result;
+        }
+
+        public async Task<VectorIdent> FindVectorIdentAsync<TVector>(Guid relationId) where TVector : Vector
+        {
+            var vectorType = Common.Unpack<TVector>();
+            var R = this.R(vectorType.Relation);
+            var S = N(vectorType.Source);
+            var T = N(vectorType.Target);
+            var relationshipAttribute = Common.Attribute<RelationshipAttribute>(vectorType.Relation);
+            string pattern = "";
+            if (relationshipAttribute.Direction == RelationshipDirection.Outgoing)
+            {
+                pattern = $"(x:{S})-[r:{R}]->(y:{T})";
+            }
+            else
+            {
+                pattern = $"(x:{S})<-[r:{R}]-(y:{T})";
+            }
+            var query = graph.Match(pattern).Where((IGuid r) => r.Guid == relationId);
             var result = await query.FirstOrDefaultAsync(() => new VectorIdent
             {
                 SourceId = Return.As<Guid>("x.Guid"),
@@ -446,27 +624,27 @@ namespace Neo4jClientVector.Core.Services
             {
                 string pattern = "";
                 var vectorType = Common.Unpack<TVector>();
-                var attr = Common.Attribute<GraphRelationshipAttribute>(vectorType.Relation);
+                var attr = Common.Attribute<RelationshipAttribute>(vectorType.Relation);
                 if (attr.Direction == RelationshipDirection.Outgoing)
                 {
-                    pattern = $"(x:{N(vectorType.Source)})-[r:{R(vectorType.Relation)}]->(y:{N(vectorType.Source)})";
+                    pattern = $"(x:{N(vectorType.Source)})-[r:{R(vectorType.Relation)}]->(y:{N(vectorType.Target)})";
                 }
                 else
                 {
-                    pattern = $"(x:{N(vectorType.Source)})<-[r:{R(vectorType.Relation)}]-(y:{N(vectorType.Source)})";
+                    pattern = $"(x:{N(vectorType.Source)})<-[r:{R(vectorType.Relation)}]-(y:{N(vectorType.Target)})";
                 }
-                var query = graph.Match(pattern).WhereStart();
+                var query = graph.Match(pattern).Where();
                 if (ident.SourceId != Guid.Empty)
                 {
-                    query = query.AndWhere((IIdentifiable x) => x.Guid == ident.SourceId);
+                    query = query.AndWhere((IGuid x) => x.Guid == ident.SourceId);
                 }
-                if (ident.TargetId != Guid.Empty)
-                {
-                    query = query.AndWhere((IIdentifiable y) => y.Guid == ident.TargetId);
-                }
+                //if (ident.TargetId != Guid.Empty)
+                //{
+                //    query = query.AndWhere((IGuid y) => y.Guid == ident.TargetId);
+                //}
                 if (ident.RelationId.HasValue)
                 {
-                    query = query.AndWhere((IIdentifiable r) => r.Guid == ident.RelationId.Value);
+                    query = query.AndWhere((IGuid r) => r.Guid == ident.RelationId.Value);
                 }
                 await query.Delete("r")
                            .ExecuteWithoutResultsAsync();
@@ -484,19 +662,9 @@ namespace Neo4jClientVector.Core.Services
         {
             try
             {
-                var vectorType = Common.Unpack<TVector>();
-                if (false == relationGuid.HasValue)
-                {
-                    relationGuid = Guid.NewGuid();
-                }
-                var query = graph.Match(
-                    "(source:" + N(vectorType.Source) + " { Guid: {sourceGuid} })",
-                    "(target:" + N(vectorType.Target) + " { Guid: {targetGuid} })")
-                    .WithParams(new { sourceGuid, targetGuid })
-                    .CreateUnique(VectorPattern(vectorType))
-                    .WithParams(new { relation = new Relation { Guid = relationGuid.Value } });
-                await query.ExecuteWithoutResultsAsync();
-
+                await graph.Match<TVector>("x", "y", sourceGuid, targetGuid)
+                           .Relate<TVector>("x", "y", new Relation { Guid = relationGuid ?? Guid.NewGuid() })
+                           .ExecuteWithoutResultsAsync();
                 return Success();
             }
             catch (Exception ex)
@@ -516,7 +684,7 @@ namespace Neo4jClientVector.Core.Services
             where TSource : Entity
             where TTarget : Entity
         {
-            var attribute = Common.Attribute<GraphRelationshipAttribute>(vector.Relation);
+            var attribute = Common.Attribute<RelationshipAttribute>(vector.Relation);
             if (attribute.Direction == RelationshipDirection.Outgoing)
             {
                 return "(source)-[r:" + R<TRel>() + " {relation}]->(target)";
@@ -619,15 +787,15 @@ namespace Neo4jClientVector.Core.Services
             return FindQuery<T>(guid).FirstOrDefault(x => x.As<T>());
         }
 
-        protected async Task<T> FindByNameAsync<T>(string name) where T : INameable
+        protected async Task<T> FindByNameAsync<T>(string name) where T : IName
         {
             return await graph.Match("(x:" + N<T>() + " { Name: {name} })").WithParams(new { name })
                               .FirstOrDefaultAsync(x => x.As<T>());
         }
 
-        protected async Task<T> FindByURICodeAsync<T>(string uriCode) where T : Entity
+        protected async Task<T> FindByCodeAsync<T>(string code) where T : Entity
         {
-            return await graph.Match("(x:" + N<T>() + " { URICode: {uriCode} })").WithParams(new { uriCode })
+            return await graph.Match("(x:" + N<T>() + " { Code: {code} })").WithParams(new { code })
                               .FirstOrDefaultAsync(x => x.As<T>());
         }
 
@@ -642,7 +810,7 @@ namespace Neo4jClientVector.Core.Services
         /// <typeparam name="T"></typeparam>
         /// <param name="guid"></param>
         /// <returns></returns>
-        ICypherFluentQuery FindQuery<T>(Guid guid) where T : IIdentifiable
+        ICypherFluentQuery FindQuery<T>(Guid guid) where T : IGuid
         {
             return graph.Match("(x:" + N<T>() + " { Guid: {guid} })").WithParams(new { guid });
         }

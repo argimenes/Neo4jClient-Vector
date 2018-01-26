@@ -1,10 +1,13 @@
-﻿using Neo4jClient.Cypher;
+﻿using Neo4jClient;
+using Neo4jClient.Cypher;
+using Neo4jClientVector.Attributes;
 using Neo4jClientVector.Nodes;
 using Neo4jClientVector.Relationships;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -12,6 +15,18 @@ namespace Neo4jClientVector.Helpers
 {
     public static class TypeExtensions
     {
+        public static string Label(this Type type)
+        {
+            return Common.NodeLabel(type);
+        }
+        public static string NodeKey(this Type type)
+        {
+            return Common.NodeKey(type);
+        }
+        public static string RelationshipKey(this Type type)
+        {
+            return Common.RelationshipKey(type);
+        }
         public static bool Implements<T>(this Type type)
         {
             return typeof(T).IsAssignableFrom(type);
@@ -19,6 +34,11 @@ namespace Neo4jClientVector.Helpers
     }
     public static class StringExtensions
     {
+        public static string Join<TVector>(this string prefix, string rel = null, string to = null, string relPath = null) where TVector : Vector
+        {
+            return prefix + Common.JoinVector<TVector>(rel: rel, to: to, relPath: relPath);
+        }
+
         public static string[] SplitCamelCase(this string value)
         {
             return Common.SplitCamelCase(value);
@@ -94,7 +114,10 @@ namespace Neo4jClientVector.Helpers
             }
             return (T)(obj.__(x => x.GetType()).GetMethod(methodName).__(x => x.Invoke(obj, args)));
         }
-
+        public static MethodInfo GetGenericMethod<T>(this Type type, string methodName)
+        {
+            return type.GetMethod(methodName).__(x => x.MakeGenericMethod(typeof(T)));
+        }
         public static T Call<T>(this object obj, string methodName, Type genericType, params object[] args)
         {
             if (obj == null)
@@ -131,6 +154,103 @@ namespace Neo4jClientVector.Helpers
 
     public static class ICypherFluentQueryExtensions
     {
+        /// <summary>
+        /// Returns a vectorised PATH statement for <typeparamref name="TVector"/>. Default value of <paramref name="path"/> is 'p'.
+        /// </summary>
+        /// <typeparam name="TVector"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="path"></param>
+        /// <param name="rel"></param>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <param name="relPath"></param>
+        /// <param name="fromLabel"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery Path<TVector>(this ICypherFluentQuery query, string path = null, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true) where TVector : Vector
+        {
+            path = path ?? "p";
+            var pattern = $"{path}=" + Common.Vector<TVector>(rel, from, to, relPath, fromLabel);
+            query = query.Match(pattern);
+            return query;
+        }
+
+        /// <summary>
+        /// Returns a vectorised PATH statement for hypernode starting with <typeparamref name="TFirstVector"/> and ending in <typeparamref name="TSecondVector"/>. Default value of <paramref name="path"/> is 'p'.
+        /// </summary>
+        /// <typeparam name="TFirstVector"></typeparam>
+        /// <typeparam name="TSecondVector"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="path"></param>
+        /// <param name="rel"></param>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <param name="relPath"></param>
+        /// <param name="fromLabel"></param>
+        /// <param name="to2"></param>
+        /// <param name="rel2"></param>
+        /// <param name="relPath2"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery Path<TFirstVector, TSecondVector>(this ICypherFluentQuery query,
+            string path = null, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true, string to2 = null, string rel2 = null, string relPath2 = null)
+            where TFirstVector : Vector
+            where TSecondVector : Vector
+        {
+            path = path ?? "p";
+            var pattern = $"{path}=" + Common.Vector<TFirstVector>(rel, from, to, relPath, fromLabel).Join<TSecondVector>(rel: rel2, to: to2, relPath: relPath2);
+            query = query.Match(pattern);
+            return query;
+        }
+
+        /// <summary>
+        /// Matches the source and target nodes of the <paramref name="TVector"/>.
+        /// </summary>
+        /// <typeparam name="TVector"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <param name="sourceGuid"></param>
+        /// <param name="targetGuid"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery Match<TVector>(this ICypherFluentQuery query, string from, string to, Guid sourceGuid, Guid targetGuid) where TVector : Vector
+        {
+            var vectorType = Common.Unpack<TVector>();
+            query = query.Match(
+                    "(" + from + ":" + Common.NodeLabel(vectorType.Source) + " { Guid: {sourceGuid} })",
+                    "(" + to + ":" + Common.NodeLabel(vectorType.Target) + " { Guid: {targetGuid} })")
+                    .WithParams(new { sourceGuid, targetGuid });
+            return query;
+        }
+
+        /// <summary>
+        /// Creates a unique <paramref name="relation"/> between <paramref name="sourceKey"/> and <paramref name="targetKey"/>.
+        /// </summary>
+        /// <typeparam name="TVector"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="sourceKey"></param>
+        /// <param name="targetKey"></param>
+        /// <param name="relation"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery Relate<TVector>(this ICypherFluentQuery query, string sourceKey, string targetKey, Relation relation) where TVector : Vector
+        {
+            query = query.CreateUnique(CreateUniquePattern<TVector>(sourceKey, "r", targetKey))
+                         .WithParams(new { relation });
+            return query;
+        }
+
+        public static string CreateUniquePattern<TVector>(string sourceKey, string relationKey, string targetKey, string relationParam = "relation") where TVector : Vector
+        {
+            var type = Common.Unpack<TVector>();
+            var relationAttribute = Attribute.GetCustomAttribute(type.Relation, typeof(RelationshipAttribute)) as RelationshipAttribute;
+            if (relationAttribute.Direction == RelationshipDirection.Outgoing)
+            {
+                return "(" + sourceKey + " )-[" + relationKey + ":" + relationAttribute.Type + " {" + relationParam + "}]->(" + targetKey + ")";
+            }
+            else
+            {
+                return "(" + sourceKey + ")<-[" + relationKey + ":" + relationAttribute.Type + " {" + relationParam + "}]-(" + targetKey + ")";
+            }
+        }
+
         //public static ICypherFluentQuery CreateUnique<TRel, TSource, TTarget>(this ICypherFluentQuery query, Vector<TRel, TSource, TTarget> vector, string relKey = "relation", string sourceKey = "source", string targetKey = "target")
         //    where TRel : Relation, new()
         //    where TSource : Entity
@@ -140,40 +260,196 @@ namespace Neo4jClientVector.Helpers
         //    return query;
         //}
 
-        public static ICypherFluentQuery Match<TEntity>(this ICypherFluentQuery query, string nodeVar = null) where TEntity : Entity
+        public static ICypherFluentQuery From<TEntity>(this ICypherFluentQuery query, string nodeVar = null) where TEntity : Entity
         {
             nodeVar = nodeVar ?? Common.GraphNodeKey<TEntity>();
             query = query.Match($"({nodeVar}:{Common.NodeLabel<TEntity>()})");
             return query;
         }
 
-        public static ICypherFluentQuery Match<TEntity>(this ICypherFluentQuery query, Guid guid) where TEntity : Entity
+        public static ICypherFluentQuery From<TEntity>(this ICypherFluentQuery query, Guid guid) where TEntity : Entity
         {
             query = query.Match($"({Common.GraphNodeKey<TEntity>()}:{Common.NodeLabel<TEntity>()} {{ Guid: {{guid}} }})").WithParams(new { guid });
             return query;
         }
 
-        public static ICypherFluentQuery OptionalMatch<TVector>(this ICypherFluentQuery query) where TVector : Vector
+        public static ICypherFluentQuery OptMatch<TVector>(this ICypherFluentQuery query) where TVector : Vector
         {
-            query = query.OptionalMatch(Common.Pattern<TVector>());
+            query = query.OptionalMatch(Common.Vector<TVector>());
             return query;
         }
 
-        public static ICypherFluentQuery OptionalMatch<TVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
+        /// <summary>
+        /// Returns a vectorised MATCH statement for <typeparamref name="TVector"/>.
+        /// </summary>
+        /// <typeparam name="TVector"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="from"></param>
+        /// <param name="rel"></param>
+        /// <param name="relPath"></param>
+        /// <param name="to"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery Match<TVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
         {
-            var pattern = Common.Pattern<TVector>(rel, from, to, relPath);
+            query = query.Match(Common.Vector<TVector>(rel, from, to, relPath));
+            return query;
+        }
+
+        public static string Pattern<TVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
+        {
+            return Common.Vector<TVector>(rel, from, to, relPath);
+        }
+
+        public static ICypherFluentQuery Filter<TSearch>(this ICypherFluentQuery query, TSearch search, Func<ICypherFluentQuery, TSearch, ICypherFluentQuery> filter) where TSearch : class
+        {
+            query = filter(query, search);
+            return query;
+        }
+
+        public static ICypherFluentQuery If(this ICypherFluentQuery query, bool condition, Func<ICypherFluentQuery, ICypherFluentQuery> thenDo, Func<ICypherFluentQuery, ICypherFluentQuery> elseDo = null)
+        {
+            if (condition)
+            {
+                query = thenDo(query);
+            }
+            else
+            {
+                if (elseDo != null)
+                {
+                    query = elseDo(query);
+                }
+            }
+            return query;
+        }
+
+        /// <summary>
+        /// Returns a MATCH statement for a hypernode starting with <typeparamref name="TFirstVector"/> and ending in <typeparamref name="TSecondVector"/>.
+        /// </summary>
+        /// <typeparam name="TFirstVector"></typeparam>
+        /// <typeparam name="TSecondVector"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="from"></param>
+        /// <param name="rel"></param>
+        /// <param name="relPath"></param>
+        /// <param name="to"></param>
+        /// <param name="rel2"></param>
+        /// <param name="relPath2"></param>
+        /// <param name="to2"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery Match<TFirstVector, TSecondVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null, string rel2 = null, string relPath2 = null, string to2 = null) where TFirstVector : Vector where TSecondVector : Vector
+        {
+            var pattern = HyperNodeVector<TFirstVector, TSecondVector>(from, rel, relPath, to, rel2, relPath2, to2);
+            query = query.Match(pattern);
+            return query;
+        }
+
+        public static string HyperNodeVector<TFirstVector, TSecondVector>(string from, string rel, string relPath, string to, string rel2, string relPath2, string to2)
+            where TFirstVector : Vector
+            where TSecondVector : Vector
+        {
+            return Common.Vector<TFirstVector>(rel, from, to, relPath) + Common.JoinVector<TSecondVector>(rel: rel2, relPath: relPath2, to: to2);
+        }
+
+        /// <summary>
+        /// Returns an OPTIONAL MATCH statement for a hypernode starting with <typeparamref name="TFirstVector"/> and ending in <typeparamref name="TSecondVector"/>.
+        /// </summary>
+        /// <typeparam name="TFirstVector"></typeparam>
+        /// <typeparam name="TSecondVector"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="from"></param>
+        /// <param name="rel"></param>
+        /// <param name="relPath"></param>
+        /// <param name="to"></param>
+        /// <param name="rel2"></param>
+        /// <param name="relPath2"></param>
+        /// <param name="to2"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery OptMatch<TFirstVector, TSecondVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null, string rel2 = null, string relPath2 = null, string to2 = null) where TFirstVector : Vector where TSecondVector : Vector
+        {
+            var pattern = HyperNodeVector<TFirstVector, TSecondVector>(from, rel, relPath, to, rel2, relPath2, to2);
             query = query.OptionalMatch(pattern);
             return query;
         }
 
-        public static ICypherFluentQuery WhereStart(this ICypherFluentQuery query)
+        /// <summary>
+        /// Returns a vectorised OPTIONAL MATCH statement for <typeparamref name="TVector"/>.
+        /// </summary>
+        /// <typeparam name="TVector"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="from"></param>
+        /// <param name="rel"></param>
+        /// <param name="relPath"></param>
+        /// <param name="to"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery OptMatch<TVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
+        {
+            var pattern = Common.Vector<TVector>(rel, from, to, relPath);
+            query = query.OptionalMatch(pattern);
+            return query;
+        }
+
+        /// <summary>
+        /// Returns a WHERE statement that always evaluates to true, so that dynamic AND WHERE clauses can be added to it.
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery Where(this ICypherFluentQuery query)
         {
             return query.Where("1 = 1");
         }
 
+        public static ICypherFluentQuery AndWhere(this ICypherFluentQuery query, string prop, string value)
+        {
+            return query.AndWhere($"{prop} = '{value}'");
+        }
+
+        public static ICypherFluentQuery AndWhere(this ICypherFluentQuery query, string prop, bool value)
+        {
+            return query.AndWhere(prop, value.ToString());
+        }
+
+        public static ICypherFluentQuery AndWhere(this ICypherFluentQuery query, string prop, Guid? value)
+        {
+            return query.AndWhere($"{prop} = '{value.Value}'");
+        }
+
+        /// <summary>
+        /// Returns an AND WHERE statement that performs a case-insensitive partial match on <paramref name="value"/>.
+        /// </summary>
+        /// <param name="query"></param>
+        /// <param name="prop"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
         public static ICypherFluentQuery AndWhereLike(this ICypherFluentQuery query, string prop, string value)
         {
             return query.AndWhere($"{prop} =~ '{PartialMatch(value)}'");
+        }
+
+        public static ICypherFluentQuery Where(this ICypherFluentQuery query, string prop, string value)
+        {
+            return query.Where($"{prop} = '{value}'");
+        }
+
+        public static ICypherFluentQuery Where(this ICypherFluentQuery query, string prop, Guid value)
+        {
+            return query.Where($"{prop} = '{value}'");
+        }
+
+        public static ICypherFluentQuery Where(this ICypherFluentQuery query, string prop, Guid? value)
+        {
+            return query.Where($"{prop} = '{value.Value}'");
+        }
+
+        /// <summary>
+        /// Returns a WHERE statement that performs a case-insensitive partial match on <paramref name="value"/>.
+        /// </summary>
+        /// <param name="query"></param>
+        /// <param name="prop"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static ICypherFluentQuery WhereLike(this ICypherFluentQuery query, string prop, string value)
+        {
+            return query.Where($"{prop} =~ '{PartialMatch(value)}'");
         }
 
         static string PartialMatch(string value)
@@ -198,9 +474,16 @@ namespace Neo4jClientVector.Helpers
         {
             return await query.Return(expression).FirstOrDefaultAsync();
         }
+        public static async Task<TOutput> To<TInput, TOutput>(this TInput result, Func<TInput, TOutput> transformer)
+            where TInput : class
+            where TOutput : class, new()
+        {
+            return transformer(result);
+        }
         public static async Task<TResult> FirstOrDefaultAsync<TResult>(this ICypherFluentQuery query, Expression<Func<ICypherResultItem, TResult>> expression)
         {
-            return await query.Return(expression).FirstOrDefaultAsync();
+            var returnExp = query.Return(expression);
+            return await returnExp.FirstOrDefaultAsync();
         }
         public static async Task<TResult> FirstOrDefaultAsync<TResult>(this ICypherFluentQuery query, Expression<Func<TResult>> expression)
         {
@@ -226,13 +509,24 @@ namespace Neo4jClientVector.Helpers
         {
             if (orderBy.HasValue())
             {
-                return (await query.Return(expression).OrderBy(orderBy).ResultsAsync).ToList();
+                var returnExp = query.Return(expression).OrderBy(orderBy);
+                return (await returnExp.ResultsAsync).ToList();
             }
             return (await query.Return(expression).ResultsAsync).ToList();
         }
     }
     public static class GenericExtensions
     {
+        public static T ToEnum<T>(this string value, T defaultValue = default(T)) where T : struct, IConvertible
+        {
+            if (value == null)
+            {
+                return defaultValue;
+            }
+            T parse = defaultValue;
+            Enum.TryParse(value, out parse);
+            return parse;
+        }
         public static T To<T>(this object value)
         {
             var t = typeof(T);

@@ -3,6 +3,7 @@ using Neo4jClientVector.Attributes;
 using Neo4jClientVector.Models;
 using Neo4jClientVector.Nodes;
 using Neo4jClientVector.Relationships;
+using Neo4jClientVector.Helpers;
 using Newtonsoft.Json;
 using System;
 using System.Linq;
@@ -27,84 +28,121 @@ namespace Neo4jClientVector.Helpers
 
         public static string RelationType(Type relationType)
         {
-            return Attribute<GraphRelationshipAttribute>(relationType).Type;
+            return Attribute<RelationshipAttribute>(relationType).Type;
         }
 
-        public static string Pattern<TVector>(string relationKey = null, string sourceKey = null, string targetKey = null, string relPath = null) where TVector : Vector
+        public static string Vector<TVector>(string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true) where TVector : Vector
         {
-            return PatternInternal(typeof(TVector), relationKey, sourceKey, targetKey, relPath);
+            return PatternInternal(typeof(TVector), rel, from, to, relPath, fromLabel: fromLabel);
         }
 
-        public static string Pattern<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, string relationKey = null, string sourceKey = null, string targetKey = null)
+        public static string JoinVector<TVector>(string rel = null, string to = null, string relPath = null) where TVector : Vector
+        {
+            return JoinPatternInternal(typeof(TVector), rel: rel, to: to, relPath: relPath);
+        }
+
+        public static string Pattern<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, string rel = null, string from = null, string to = null, bool fromLabel = true)
             where TRel : Relation, new()
             where TSource : Entity
             where TTarget : Entity
         {
-            return PatternInternal(vector.GetType(), relationKey, sourceKey, targetKey);
+            return PatternInternal(vector.GetType(), rel, from, to, fromLabel: fromLabel);
         }
 
-        public static string Pattern(Type vectorType, string relationKey = null, string sourceKey = null, string targetKey = null)
+        public static string Pattern(Type vectorType, string rel = null, string from = null, string to = null, bool fromLabel = true)
         {
             var genericVectorType = vectorType.UnderlyingSystemType.BaseType;
-            return PatternInternal(genericVectorType, relationKey, sourceKey, targetKey);
+            return PatternInternal(genericVectorType, rel, from, to, fromLabel: fromLabel);
         }
 
-        private static string PatternInternal(Type vectorType, string relationKey = null, string sourceKey = null, string targetKey = null, string relPath = null)
+        private static string PatternInternal(Type vectorType, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true)
         {
             relPath = relPath ?? "";
             var type = Unpack(vectorType);
-            var relationAttribute = Attribute<GraphRelationshipAttribute>(type.Relation);
+            var relationAttribute = Attribute<RelationshipAttribute>(type.Relation);
             var RType = GraphRelationshipName(type.Relation);
-            var SLabel = NodeLabel(type.Source);
-            var TLabel = NodeLabel(type.Target);
-            var RKey = relationKey ?? GraphRelationshipKey(type.Relation);
-            var SKey = sourceKey ?? GraphNodeKey(type.Source);
-            var TKey = targetKey ?? GraphNodeKey(type.Target);
+            var SLabel = fromLabel ? ":" + type.Source.Label() : "";
+            var TLabel = type.Target.Label();
+            var RKey = rel ?? RelationshipKey(type.Relation);
+            var SKey = from ?? SourceNodeKey(type.Source);
+            var TKey = to ?? TargetNodeKey(type.Target);
             var pattern = "";
             if (relationAttribute.Direction == RelationshipDirection.Outgoing)
             {
-                pattern = $"({SKey}:{SLabel})-[{RKey}:{RType}{relPath}]->({TKey}:{TLabel})";
+                pattern = $"({SKey}{SLabel})-[{RKey}:{RType}{relPath}]->({TKey}:{TLabel})";
             }
             else
             {
-                pattern = $"({SKey}:{SLabel})<-[{RKey}:{RType}{relPath}]-({TKey}:{TLabel})";
+                pattern = $"({SKey}{SLabel})<-[{RKey}:{RType}{relPath}]-({TKey}:{TLabel})";
             }
             return pattern;
         }
 
-        public static string GraphRelationshipKey(Type type)
+        private static string JoinPatternInternal(Type vectorType, string rel = null, string to = null, string relPath = null)
+        {
+            relPath = relPath ?? "";
+            var type = Unpack(vectorType);
+            var relationAttribute = Attribute<RelationshipAttribute>(type.Relation);
+            var RType = GraphRelationshipName(type.Relation);
+            var TLabel = type.Target.Label();
+            var RKey = rel ?? RelationshipKey(type.Relation);
+
+            var TKey = to ?? TargetNodeKey(type.Target);
+            var pattern = "";
+            if (relationAttribute.Direction == RelationshipDirection.Outgoing)
+            {
+                pattern = $"-[{RKey}:{RType}{relPath}]->({TKey}:{TLabel})";
+            }
+            else
+            {
+                pattern = $"<-[{RKey}:{RType}{relPath}]-({TKey}:{TLabel})";
+            }
+            return pattern;
+        }
+
+        public static string RelationshipKey(Type type)
         {
             var name = GraphRelationshipName(type);
             var parts = name.Split(new char[] { '_' }, StringSplitOptions.RemoveEmptyEntries)
                             .Select(x => x.Substring(0, 1).ToLower());
             var abbrev = string.Join("", parts);
-            return Attribute<GraphRelationshipAttribute>(type).__(x => x.Key) ?? abbrev;
+            return Attribute<RelationshipAttribute>(type).__(x => x.Key) ?? abbrev;
         }
 
         public static string GraphRelationshipName(Type type)
         {
-            return Attribute<GraphRelationshipAttribute>(type).__(x => x.Type);
+            return Attribute<RelationshipAttribute>(type).__(x => x.Type);
         }
 
         public static string GraphRelationshipName<TRel>() where TRel : Relation
         {
-            return Attribute<GraphRelationshipAttribute, TRel>().__(x => x.Type);
+            return Attribute<RelationshipAttribute, TRel>().__(x => x.Type);
         }
 
         public static string GraphRelationshipName<TRel>(TRel relation) where TRel : Relation
         {
-            return Attribute<GraphRelationshipAttribute>(relation).__(x => x.Type);
+            return Attribute<RelationshipAttribute>(relation).__(x => x.Type);
         }
 
         public static string GraphNodeKey<TEntity>() where TEntity : Entity
         {
             var type = typeof(TEntity);
-            return Attribute<GraphNodeAttribute>(type).__(x => x.Key) ?? type.Name.Abbreviate();
+            return Attribute<NodeAttribute>(type).__(x => x.Key) ?? type.Name.Abbreviate();
         }
 
-        public static string GraphNodeKey(Type type)
+        public static string NodeKey(Type type)
         {
-            return Attribute<GraphNodeAttribute>(type).__(x => x.Key) ?? type.Name.Abbreviate();
+            return Attribute<NodeAttribute>(type).__(x => x.Key) ?? type.Name.Abbreviate();
+        }
+
+        public static string SourceNodeKey(Type type)
+        {
+            return Attribute<SourceNodeAttribute>(type).__(x => x.Key) ?? NodeKey(type);
+        }
+
+        public static string TargetNodeKey(Type type)
+        {
+            return Attribute<TargetNodeAttribute>(type).__(x => x.Key) ?? NodeKey(type);
         }
 
         public static string Abbreviate(string value)
@@ -179,12 +217,12 @@ namespace Neo4jClientVector.Helpers
 
         public static string NodeLabel<TEntity>()
         {
-            return Attribute<GraphNodeAttribute, TEntity>().__(x => x.Name) ?? typeof(TEntity).UnderlyingSystemType.Name;
+            return Attribute<NodeAttribute, TEntity>().__(x => x.Label) ?? typeof(TEntity).UnderlyingSystemType.Name;
         }
 
         public static string NodeLabel(Type entityType)
         {
-            return Attribute<GraphNodeAttribute>(entityType).__(x => x.Name) ?? entityType.UnderlyingSystemType.Name;
+            return Attribute<NodeAttribute>(entityType).__(x => x.Label) ?? entityType.UnderlyingSystemType.Name;
         }
 
         public static string ComputeHash(string value)
@@ -217,3 +255,4 @@ namespace Neo4jClientVector.Helpers
 
     }
 }
+

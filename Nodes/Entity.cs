@@ -10,11 +10,11 @@ namespace Neo4jClientVector.Nodes
     {
         string Name { get; set; }
     }
-    public interface IEntity : IIdentifiable, INameable
-    {
-        DateTime DateAddedUTC { get; set; }
-        DateTime? DateModifiedUTC { get; set; }
-    }
+    //public interface IEntity : IIdentifiable, INameable
+    //{
+    //    DateTime DateAddedUTC { get; set; }
+    //    DateTime? DateModifiedUTC { get; set; }
+    //}
     public class Entity : IEntity
     {
         public Guid Guid { get; set; }
@@ -22,9 +22,9 @@ namespace Neo4jClientVector.Nodes
         /// <summary>
         /// Unique plain text identifier, such as used in a blog post slug (e.g., hyphenated title)
         /// </summary>
-        public string URICode { get; set; }
-        public DateTime DateAddedUTC { get; set; }
-        public DateTime? DateModifiedUTC { get; set; }
+        public string Code { get; set; }
+        public DateTimeOffset DateAddedUTC { get; set; }
+        public DateTimeOffset? DateModifiedUTC { get; set; }
         public bool IsDeleted { get; set; }
 
         public Entity()

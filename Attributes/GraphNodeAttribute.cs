@@ -2,9 +2,9 @@
 
 namespace Neo4jClientVector.Attributes
 {
-    public class GraphNodeAttribute : Attribute
+    public class NodeAttribute : Attribute
     {
-        public string Name { get; set; }
+        public string Label { get; set; }
         public string Key { get; set; }
     }
 }

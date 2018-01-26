@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Neo4jClientVector.Models
 {
-    public class Search<T> where T : class
+    public class Search
     {
         /// <summary>
         /// Milliseconds
@@ -14,10 +14,16 @@ namespace Neo4jClientVector.Models
         public int PageRows { get; set; }
         public int MaxPage { get; set; }
         public bool Infinite { get; set; }
+        public string Order { get; set; }
+        public SearchDirection Direction { get; set; }
+    }
+    public class Search<T> : Search where T : class
+    {
+        /// <summary>
+        /// Milliseconds
+        /// </summary>
         public string[] Groups { get; set; }
         public List<T> Results { get; set; }
-        public SearchOrder Order { get; set; }
-        public SearchDirection Direction { get; set; }
         public Search()
         {
             Page = 1;

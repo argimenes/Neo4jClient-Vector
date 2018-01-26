@@ -7,12 +7,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+using Neo4jClientVector.Relationships;
+using AutoMapper;
+using Neo4jClientVector.Helpers;
 
 namespace Neo4jClientVector.Services
 {
     public interface IService<TEntity> : IService where TEntity : Entity
     {
-        Task<TSearch> PageAsync<TSearch>(Search<TEntity> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TEntity>> selector = null, string orderBy = null, string startNode = "x")
+        Task<TSearch> PageAsync<TSearch>(Search<TEntity> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TEntity>> selector = null, OrderBy orderBy = null, string startNode = "x")
             where TSearch : Search<TEntity>, new();
         Task<TEntity> FindAsync(Guid guid);
         TEntity Find(Guid guid);
@@ -20,8 +23,9 @@ namespace Neo4jClientVector.Services
         Task<TEntity> FindByURICodeAsync(string uriCode);
         Task<Result> DeleteNodeAsync(Guid guid);
         Task<Result> UndeleteNodeAsync(Guid guid);
+        Task<Result> SaveOrUpdateAsync(TEntity data);
     }
-    public class Service<TEntity> : Service where TEntity : Entity, new()
+    public abstract class Service<TEntity> : Service where TEntity : Entity, new()
     {
         #region constructor
         public Service(IGraphDataContext _db) : base(_db)
@@ -29,6 +33,42 @@ namespace Neo4jClientVector.Services
 
         }
         #endregion
+
+        protected static string Vector<TVector>(string relationKey = null, string from = null, string to = null, string relPath = null, bool sourceLabel = true) where TVector : Vector
+        {
+            return Common.Vector<TVector>(relationKey, from, to, relPath, sourceLabel);
+        }
+
+        protected async Task<Result> SaveVectorAsync<TVector>(TEntity entity, TVector vector)
+            where TVector : Vector
+        {
+            var ident = ToVectorIdent(vector);
+            ident.SourceId = entity.Guid;
+            if (ident.RelationId.HasValue)
+            {
+                await DeleteAsync<TVector>(ident);
+            }
+            return await RelateAsync<TVector>(ident);
+        }
+
+        protected VectorIdent ToVectorIdent<TVector>(TVector vector)
+            where TVector : Vector
+        {
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<TVector, Vector<Relation, Entity, Entity>>();
+            });
+            var generic = Mapper.Map<Vector<Relation, Entity, Entity>>(vector); // vector as Vector<Relation, Entity, Entity>;
+            var ident = new VectorIdent
+            {
+                SourceId = generic.Source.__(x => x.Guid),
+                RelationId = generic.Relation.__(x => x.Guid),
+                TargetId = generic.Target.__(x => x.Guid)
+            };
+            return ident;
+        }
+
+        public abstract Task<Result> SaveOrUpdateAsync(TEntity data);
 
         public async Task<Result> UpdateAsync(Guid guid, Action<TEntity> update = null)
         {
@@ -47,10 +87,10 @@ namespace Neo4jClientVector.Services
 
         public async Task<TEntity> FindByURICodeAsync(string uriCode)
         {
-            return await FindByURICodeAsync<TEntity>(uriCode);
+            return await FindByCodeAsync<TEntity>(uriCode);
         }
 
-        public async Task<TSearch> PageAsync<TSearch>(Search<TEntity> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TEntity>> selector = null, string orderBy = null, string startNode = "x")
+        public async Task<TSearch> PageAsync<TSearch>(Search<TEntity> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TEntity>> selector = null, OrderBy orderBy = null, string startNode = null)
             where TSearch : Search<TEntity>, new()
         {
             return await PageAsync<TEntity, TSearch>(query, records, selector: selector, orderBy: orderBy, startNode: startNode);
