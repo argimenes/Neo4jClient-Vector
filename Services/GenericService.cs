@@ -1,5 +1,4 @@
 ﻿using Neo4jClientVector.Core.Services;
-using Neo4jClient.Cypher;
 using Neo4jClientVector.Contexts;
 using Neo4jClientVector.Models;
 using Neo4jClientVector.Nodes;
@@ -8,8 +7,9 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Neo4jClientVector.Relationships;
-using AutoMapper;
 using Neo4jClientVector.Helpers;
+using Neo4jClient.Cypher;
+using AutoMapper;
 
 namespace Neo4jClientVector.Services
 {
