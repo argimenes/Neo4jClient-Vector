@@ -31,19 +31,19 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="AutoMapper, Version=6.2.2.0, Culture=neutral, PublicKeyToken=be96cd2c38ef1005, processorArchitecture=MSIL">
-      <HintPath>..\Codex 2.0\packages\AutoMapper.6.2.2\lib\net45\AutoMapper.dll</HintPath>
+      <HintPath>packages\AutoMapper.6.2.2\lib\net45\AutoMapper.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="log4net, Version=2.0.8.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
-      <HintPath>..\Codex 2.0\packages\log4net.2.0.8\lib\net45-full\log4net.dll</HintPath>
+      <HintPath>packages\log4net.2.0.8\lib\net45-full\log4net.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Neo4jClient, Version=2.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\Codex 2.0\packages\Neo4jClient.2.0.0.8\lib\net45\Neo4jClient.dll</HintPath>
+      <HintPath>packages\Neo4jClient.2.0.0.8\lib\net45\Neo4jClient.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\Codex 2.0\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
