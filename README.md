@@ -11,12 +11,12 @@ The first step is to clone the repository, build it locally, and add a project r
 - Install Neo4jClient Nuget package v.2.0.0.8
 
 ## An example
-There are a number of core classes in Neo4jClient-Vector that you will need to inherit from to use the project. The `Entity` close represents a Cypher node and the `Relation` class represents a Cypher relationship. These classes can be decorated with the attributes `GraphRelationship` and `GraphNode`. `GraphRelationship` is the most important one is it is required for defining the properties of the Cypher vector pattern.
+There are a number of core classes in Neo4jClient-Vector that you will need to inherit from to use the project. The `Entity` close represents a Cypher node and the `Relation` class represents a Cypher relationship. These classes can be decorated with the attributes `Relationship` and `Node`. `Relationship` is the most important one is it is required for defining the properties of the Cypher vector pattern.
 
 Here is a typical example of how you could use it:
 
 ```c#
-[GraphRelationship(Type = "kind_of_category", Direction = RelationshipDirection.Outgoing)]
+[Relationship(Type = "kind_of_category", Direction = RelationshipDirection.Outgoing)]
 public class KindOfCategoryRelation : Relation { }
 ```
 
@@ -29,7 +29,7 @@ This example is equivalent to writing the following Cypher pattern:
 To make a proper Vector, though, we will also need to define any node classes.
 
 ```c#
-[GraphNode(Name = "cat")]
+[Node(Name = "cat")]
 public class Category : Entity
 {
     public string Description { get; set; }
@@ -51,18 +51,18 @@ This represents the following Cypher pattern:
 Now that we have a our own Vector we can write code like the following, utilising the library's extension methods:
 
 ```c#
-public async Task<IEnumerable<Category>> ChildrenOfAsync(string uriCode)
+public async Task<IEnumerable<Category>> ChildrenOfAsync(string code)
 {
-    var category = await FindByURICodeAsync<Category>(uriCode);
-    var query = graph.Match<Category>(category.Guid)
-                     .OptionalMatch<KindOfCategory>(to: "child");
-    return await query.ToListAsync(child => child.As<Category>(), orderBy: "child.Name");
+    var category = await FindByCodeAsync<Category>(code);
+    var query = graph.From<Category>(category.Guid)
+                     .OptMatch<KindOfCategory>(to: "child");
+    return await query.ToListAsync(child => child.As<Category>(), orderBy: OrderBy.From(query).When("ByName", "child.Name"));
 }
 
 public async Task<CategoryGraph> FindGraphAsync(Guid guid)
 {
-    return await graph.Match<Category>(guid)
-                      .OptionalMatch<KindOfCategory>(to: "parents")
+    return await graph.From<Category>(guid)
+                      .OptMatch<KindOfCategory>(to: "parents")
                       .FirstOrDefaultAsync(c => new CategoryGraph
                       {
                           Entity = c.As<Category>(),
@@ -72,10 +72,10 @@ public async Task<CategoryGraph> FindGraphAsync(Guid guid)
 
 public async Task<SearchCategoryGraph> SearchAsync(SearchCategoryGraph query)
 {
-    var records = graph.Match<Category>();
-
-    records = records.OptionalMatch<KindOfCategory>(to: "parents");
-    records = records.OptionalMatch<KindOfCategory>(rel: "", relPath: "*", to: "ancestors");
+    var records = graph.From<Category>()
+                       .OptMatch<KindOfCategory>(to: "parents")
+                       .OptMatch<KindOfCategory>(rel: "", relPath: "*", to: "ancestors");
+                       
     records = Filter(query, records);
 
     return await PageAsync<CategoryGraph, SearchCategoryGraph>(query, records,
@@ -85,7 +85,7 @@ public async Task<SearchCategoryGraph> SearchAsync(SearchCategoryGraph query)
             Ancestors = Return.As<IEnumerable<string>>("collect(ancestors.Name)"),
             Parents = Return.As<IEnumerable<KindOfCategory>>(Collect<KindOfCategory>("parents"))
         },
-        orderBy: "c.Name ASC", startNode: "c");
+        orderBy: OrderBy(query).When("ByName", "c.Name"));
 }
 ```
 
@@ -97,7 +97,7 @@ public async Task<Result> SaveOrUpdateAsync(Category data)
     return await SaveOrUpdateAsync(data, update: x =>
     {
         x.Name = data.Name;
-        x.URICode = data.URICode;
+        x.Code = data.Code;
     });
 }
 ```
