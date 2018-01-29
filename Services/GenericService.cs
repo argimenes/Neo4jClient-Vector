@@ -93,7 +93,7 @@ namespace Neo4jClientVector.Services
         public async Task<TSearch> PageAsync<TSearch>(Search<TEntity> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TEntity>> selector = null, OrderBy orderBy = null, string startNode = null)
             where TSearch : Search<TEntity>, new()
         {
-            return await PageAsync<TEntity, TSearch>(query, records, selector: selector, orderBy: orderBy, startNode: startNode);
+            return await PageAsync<TEntity, TSearch>(query, records, selector: selector, orderBy: orderBy, entityKey: startNode);
         }
 
         public async Task<List<TEntity>> AllAsync(string orderBy = null)

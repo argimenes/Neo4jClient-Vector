@@ -254,15 +254,15 @@ namespace Neo4jClientVector.Core.Services
             ICypherFluentQuery records,
             Expression<Func<ICypherResultItem, TEntity>> selector = null,
             OrderBy orderBy = null,
-            string startNode = null)
+            string entityKey = null)
 
             where TEntity : class
             where TSearch : Search<TEntity>, new()
         {
-            startNode = startNode ?? SearchEntityNodeKey<TEntity>();
+            entityKey = GetEntityKey(selector, entityKey);
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-            query.Count = (int)(await records.CountAsync(startNode));
+            query.Count = (int)(await records.CountAsync(entityKey));
             query.MaxPage = (int)(query.Count / query.PageRows) + 1;
             if (query.Page < 1)
             {
@@ -279,13 +279,17 @@ namespace Neo4jClientVector.Core.Services
             }
             if (selector == null)
             {
-                selector = As<TEntity>(startNode);
+                selector = As<TEntity>(entityKey);
             }
-            var orderByValue = (orderBy != null ? orderBy.Render() : null);
-            query.Results = await records.ToListAsync(selector, orderBy: orderByValue);
+            query.Results = await records.ToListAsync(selector, orderBy: orderBy.__(x => x.Render()));
             stopwatch.Stop();
             query.ElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
             return query.Downcast<TSearch>();
+        }
+
+        string GetEntityKey<TEntity>(Expression<Func<ICypherResultItem, TEntity>> selector, string entityKey) where TEntity : class
+        {
+            return selector.__(exp => exp.Parameters.FirstOrDefault().__(paramexp => paramexp.Name)) ?? entityKey ?? SearchEntityNodeKey<TEntity>();
         }
 
         static string SearchEntityNodeKey<TEntity>() where TEntity : class
