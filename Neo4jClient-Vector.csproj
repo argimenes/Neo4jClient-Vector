@@ -86,8 +86,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Relationships\Relation.cs" />
     <Compile Include="Relationships\Vector.cs" />
-    <Compile Include="Services\GenericService.cs" />
-    <Compile Include="Services\Service.cs" />
+    <Compile Include="Services\EntityService.cs" />
+    <Compile Include="Services\RootService.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -39,8 +39,6 @@ namespace Neo4jClientVector.Core.Services
         Task<Result> DeleteRelationAsync(Relation relation);
         Task<Result> DeleteRelationAsync<TRel>(Guid guid) where TRel : Relation;
     }
-    
-
     public class RootService : IRootService, IDisposable
     {
         #region constructor
