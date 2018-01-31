@@ -515,6 +515,19 @@ namespace Neo4jClientVector.Helpers
             return (await query.Return(expression).ResultsAsync).ToList();
         }
     }
+    public static class ListExtensions
+    {
+        /// <summary>
+        /// Returns <paramref name="list"/> if it has any elements, otherwise returns an empty List&lt;T&gt;.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="list"></param>
+        /// <returns></returns>
+        public static List<T> OrEmpty<T>(this List<T> list)
+        {
+            return list.HasValues() ? list : new List<T>();
+        }
+    }
     public static class GenericExtensions
     {
         public static T ToEnum<T>(this string value, T defaultValue = default(T)) where T : struct, IConvertible
