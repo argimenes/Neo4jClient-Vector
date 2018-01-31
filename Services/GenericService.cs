@@ -20,7 +20,6 @@ namespace Neo4jClientVector.Services
         Task<TEntity> FindAsync(Guid guid);
         TEntity Find(Guid guid);
         Task<List<TEntity>> AllAsync(string orderBy = null);
-        Task<TEntity> FindByURICodeAsync(string uriCode);
         Task<Result> DeleteNodeAsync(Guid guid);
         Task<Result> UndeleteNodeAsync(Guid guid);
         Task<Result> SaveOrUpdateAsync(TEntity data);
@@ -83,11 +82,6 @@ namespace Neo4jClientVector.Services
         public async Task<Result> DeleteNodeAsync(Guid guid)
         {
             return await DeleteNodeAsync<TEntity>(guid);
-        }
-
-        public async Task<TEntity> FindByURICodeAsync(string uriCode)
-        {
-            return await FindByCodeAsync<TEntity>(uriCode);
         }
 
         public async Task<TSearch> PageAsync<TSearch>(Search<TEntity> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TEntity>> selector = null, OrderBy orderBy = null, string startNode = null)

@@ -124,7 +124,7 @@ namespace Neo4jClientVector.Helpers
             return Attribute<RelationshipAttribute>(relation).__(x => x.Type);
         }
 
-        public static string GraphNodeKey<TEntity>() where TEntity : Entity
+        public static string GraphNodeKey<TEntity>() where TEntity : Root
         {
             var type = typeof(TEntity);
             return Attribute<NodeAttribute>(type).__(x => x.Key) ?? type.Name.Abbreviate();

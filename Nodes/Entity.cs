@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Neo4jClientVector.Attributes;
+using System;
 
 namespace Neo4jClientVector.Nodes
 {
@@ -10,14 +11,13 @@ namespace Neo4jClientVector.Nodes
     {
         string Name { get; set; }
     }
-    //public interface IEntity : IIdentifiable, INameable
-    //{
-    //    DateTime DateAddedUTC { get; set; }
-    //    DateTime? DateModifiedUTC { get; set; }
-    //}
-    public class Entity : IEntity
+    [Ident(Property = "Guid")]
+    public class Root : IRoot
     {
         public Guid Guid { get; set; }
+    }
+    public class Entity : Root, IEntity
+    {
         public string Name { get; set; }
         /// <summary>
         /// Unique plain text identifier, such as used in a blog post slug (e.g., hyphenated title)

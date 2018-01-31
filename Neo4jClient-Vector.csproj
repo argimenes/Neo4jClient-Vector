@@ -59,8 +59,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Attributes\GraphNodeAttribute.cs" />
-    <Compile Include="Attributes\GraphRelationshipAttribute.cs" />
+    <Compile Include="Attributes\IdentAttribute.cs" />
+    <Compile Include="Attributes\NodeAttribute.cs" />
+    <Compile Include="Attributes\RelationshipAttribute.cs" />
     <Compile Include="Attributes\SourceNodeAttribute.cs" />
     <Compile Include="Attributes\TargetNodeAttribute.cs" />
     <Compile Include="Attributes\VectorAttribute.cs" />
