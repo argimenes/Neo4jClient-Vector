@@ -23,19 +23,19 @@ namespace Neo4jClientVector.Core.Services
     {
         Task<Result> DeleteAsync<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, bool replace = false)
             where TRel : Relation, new()
-            where TSource : Entity
-            where TTarget : Entity;
+            where TSource : Root
+            where TTarget : Root;
         Task<TVector> FindVectorAsync<TVector>(Guid relationId) where TVector : Vector;
-        Task<Result> SaveOrUpdateInsideScopeAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Entity, new();
+        Task<Result> SaveOrUpdateInsideScopeAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Root, new();
         bool NArity(Type vectorType, string sourceGuid, string targetGuid);
-        Task<Result> UpdateAsync<TEntity>(Guid guid, Action<TEntity> update = null) where TEntity : Entity, new();
-        Task<Result> SaveOrUpdateAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Entity, new();
-        T Find<T>(Guid guid) where T : Entity;
-        Task<Result> SaveAsync<TEntity>(TEntity entity) where TEntity : Entity;
+        Task<Result> UpdateAsync<TEntity>(Guid guid, Action<TEntity> update = null) where TEntity : Root, new();
+        Task<Result> SaveOrUpdateAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Root, new();
+        T Find<T>(Guid guid) where T : Root;
+        Task<Result> SaveAsync<TEntity>(TEntity entity) where TEntity : Root;
         Task<Result> RelateAsync<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, bool replace = false)
             where TRel : Relation, new()
-            where TSource : Entity
-            where TTarget : Entity;
+            where TSource : Root
+            where TTarget : Root;
         Task<Result> DeleteRelationAsync(Relation relation);
         Task<Result> DeleteRelationAsync<TRel>(Guid guid) where TRel : Relation;
     }
@@ -232,7 +232,7 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        protected virtual ICypherFluentQuery FromCode<T>(string code = null, string key = null) where T : Entity
+        protected virtual ICypherFluentQuery FromCode<T>(string code = null, string key = null) where T : Root, ICode
         {
             key = key ?? Common.GraphNodeKey<T>();
             var query = graph.Match($"({key}:{N<T>()})");
@@ -243,7 +243,7 @@ namespace Neo4jClientVector.Core.Services
             return query;
         }
 
-        protected virtual ICypherFluentQuery From<T>(string key = null) where T : Entity
+        protected virtual ICypherFluentQuery From<T>(string key = null) where T : Root
         {
             key = key ?? Common.GraphNodeKey<T>();
             return graph.Match($"({key}:{N<T>()})");
@@ -429,12 +429,12 @@ namespace Neo4jClientVector.Core.Services
             return Common.RelationType(type);
         }
 
-        public async Task<Result> UpdateAsync<TEntity>(Guid guid, Action<TEntity> update = null) where TEntity : Entity, new()
+        public async Task<Result> UpdateAsync<TEntity>(Guid guid, Action<TEntity> update = null) where TEntity : Root, new()
         {
             return await SaveOrUpdateAsync(new TEntity { Guid = guid }, update: update);
         }
 
-        public async Task<Result> SaveOrUpdateAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Entity, new()
+        public async Task<Result> SaveOrUpdateAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Root, new()
         {
             using (var scope = NewScope())
             {
@@ -455,12 +455,15 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        public async Task<Result> SaveOrUpdateInsideScopeAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Entity, new()
+        public async Task<Result> SaveOrUpdateInsideScopeAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Root, new()
         {
             if (entity.Guid == Guid.Empty)
             {
                 entity.Guid = Guid.NewGuid();
-                entity.DateAddedUTC = DateTime.UtcNow;
+                if (entity is IDateAddedUTC)
+                {
+                    ((IDateAddedUTC)entity).DateAddedUTC = DateTime.UtcNow;
+                }
                 if (insert != null)
                 {
                     insert(entity);
@@ -473,7 +476,11 @@ namespace Neo4jClientVector.Core.Services
                 {
                     return NotFound(new { label = N<TEntity>(), guid = entity.Guid });
                 }
-                existing.DateModifiedUTC = DateTime.UtcNow;
+                if (entity is IDateModifiedUTC)
+                {
+                    ((IDateModifiedUTC)existing).DateModifiedUTC = DateTime.UtcNow;
+                }
+                
                 if (update != null)
                 {
                     update(existing);
@@ -484,7 +491,7 @@ namespace Neo4jClientVector.Core.Services
             return save;
         }
 
-        public async Task<Result> SaveAsync<TEntity>(TEntity entity) where TEntity : Entity
+        public async Task<Result> SaveAsync<TEntity>(TEntity entity) where TEntity : Root
         {
             try
             {
@@ -504,8 +511,8 @@ namespace Neo4jClientVector.Core.Services
 
         public async Task<Result> DeleteAsync<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, bool replace = false)
             where TRel : Relation, new()
-            where TSource : Entity
-            where TTarget : Entity
+            where TSource : Root
+            where TTarget : Root
         {
             try
             {
@@ -592,8 +599,8 @@ namespace Neo4jClientVector.Core.Services
 
         public async Task<Result> RelateAsync<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, bool replace = false)
             where TRel : Relation, new()
-            where TSource : Entity
-            where TTarget : Entity
+            where TSource : Root
+            where TTarget : Root
         {
             try
             {
@@ -685,8 +692,8 @@ namespace Neo4jClientVector.Core.Services
 
         string VectorPattern<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector)
             where TRel : Relation, new()
-            where TSource : Entity
-            where TTarget : Entity
+            where TSource : Root
+            where TTarget : Root
         {
             var attribute = Common.Attribute<RelationshipAttribute>(vector.Relation);
             if (attribute.Direction == RelationshipDirection.Outgoing)
@@ -786,7 +793,7 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        public T Find<T>(Guid guid) where T : Entity
+        public T Find<T>(Guid guid) where T : Root
         {
             return FindQuery<T>(guid).FirstOrDefault(x => x.As<T>());
         }
@@ -803,7 +810,7 @@ namespace Neo4jClientVector.Core.Services
                               .FirstOrDefaultAsync(x => x.As<T>());
         }
 
-        protected async Task<T> FindAsync<T>(Guid guid) where T : Entity
+        protected async Task<T> FindAsync<T>(Guid guid) where T : Root
         {
             return await FindQuery<T>(guid).FirstOrDefaultAsync(x => x.As<T>());
         }
