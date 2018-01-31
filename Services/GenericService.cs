@@ -13,7 +13,7 @@ using AutoMapper;
 
 namespace Neo4jClientVector.Services
 {
-    public interface IService<TEntity> : IService where TEntity : Entity
+    public interface IEntityService<TEntity> : IRootService where TEntity : Entity
     {
         Task<TSearch> PageAsync<TSearch>(Search<TEntity> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TEntity>> selector = null, OrderBy orderBy = null, string startNode = "x")
             where TSearch : Search<TEntity>, new();
@@ -24,10 +24,52 @@ namespace Neo4jClientVector.Services
         Task<Result> UndeleteNodeAsync(Guid guid);
         Task<Result> SaveOrUpdateAsync(TEntity data);
     }
-    public abstract class Service<TEntity> : Service where TEntity : Entity, new()
+    public class EntityService : RootService
     {
         #region constructor
-        public Service(IGraphDataContext _db) : base(_db)
+        public EntityService(IGraphDataContext _db) : base(_db)
+        {
+        }
+        #endregion
+
+        /// <summary>
+        /// Soft-undeletes the node.
+        /// </summary>
+        /// <typeparam name="TEntity"></typeparam>
+        /// <param name="guid"></param>
+        /// <returns></returns>
+        public async Task<Result> UndeleteNodeAsync<TEntity>(Guid guid) where TEntity : Entity
+        {
+            var existing = await FindAsync<TEntity>(guid);
+            if (existing == null)
+            {
+                return Rejected().NotFound();
+            }
+            existing.IsDeleted = false;
+            return await SaveAsync(existing);
+        }
+
+        /// <summary>
+        /// Soft-deletes the node.
+        /// </summary>
+        /// <typeparam name="TEntity"></typeparam>
+        /// <param name="guid"></param>
+        /// <returns></returns>
+        public async Task<Result> DeleteNodeAsync<TEntity>(Guid guid) where TEntity : Entity
+        {
+            var existing = await FindAsync<TEntity>(guid);
+            if (existing == null)
+            {
+                return Rejected().NotFound();
+            }
+            existing.IsDeleted = true;
+            return await SaveAsync(existing);
+        }
+    }
+    public abstract class EntityService<TEntity> : EntityService where TEntity : Entity, new()
+    {
+        #region constructor
+        public EntityService(IGraphDataContext _db) : base(_db)
         {
 
         }

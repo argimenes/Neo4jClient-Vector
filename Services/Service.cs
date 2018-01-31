@@ -19,7 +19,7 @@ using System.Reflection;
 
 namespace Neo4jClientVector.Core.Services
 {
-    public interface IService
+    public interface IRootService
     {
         Task<Result> DeleteAsync<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, bool replace = false)
             where TRel : Relation, new()
@@ -39,13 +39,15 @@ namespace Neo4jClientVector.Core.Services
         Task<Result> DeleteRelationAsync(Relation relation);
         Task<Result> DeleteRelationAsync<TRel>(Guid guid) where TRel : Relation;
     }
-    public class Service : IService, IDisposable
+    
+
+    public class RootService : IRootService, IDisposable
     {
         #region constructor
         protected readonly ILog Log = LogManager.GetLogger("Default");
         protected readonly ICypherFluentQuery graph;
         protected readonly IGraphDataContext db;
-        public Service(IGraphDataContext _db)
+        public RootService(IGraphDataContext _db)
         {
             db = _db;
             graph = _db.Client.Cypher;
@@ -479,8 +481,7 @@ namespace Neo4jClientVector.Core.Services
                 if (entity is IDateModifiedUTC)
                 {
                     ((IDateModifiedUTC)existing).DateModifiedUTC = DateTime.UtcNow;
-                }
-                
+                }                
                 if (update != null)
                 {
                     update(existing);
@@ -706,39 +707,7 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        /// <summary>
-        /// Soft-undeletes the node.
-        /// </summary>
-        /// <typeparam name="TEntity"></typeparam>
-        /// <param name="guid"></param>
-        /// <returns></returns>
-        public async Task<Result> UndeleteNodeAsync<TEntity>(Guid guid) where TEntity : Entity
-        {
-            var existing = await FindAsync<TEntity>(guid);
-            if (existing == null)
-            {
-                return Rejected().NotFound();
-            }
-            existing.IsDeleted = false;
-            return await SaveAsync(existing);
-        }
 
-        /// <summary>
-        /// Soft-deletes the node.
-        /// </summary>
-        /// <typeparam name="TEntity"></typeparam>
-        /// <param name="guid"></param>
-        /// <returns></returns>
-        public async Task<Result> DeleteNodeAsync<TEntity>(Guid guid) where TEntity : Entity
-        {
-            var existing = await FindAsync<TEntity>(guid);
-            if (existing == null)
-            {
-                return Rejected().NotFound();
-            }
-            existing.IsDeleted = true;
-            return await SaveAsync(existing);
-        }
 
         /// <summary>
         /// Hard-deletes the node and attached relationships.
