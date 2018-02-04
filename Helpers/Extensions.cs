@@ -505,11 +505,16 @@ namespace Neo4jClientVector.Helpers
         {
             return (await query.Limit(1).ResultsAsync).FirstOrDefault();
         }
-        public static async Task<List<TResult>> ToListAsync<TResult>(this ICypherFluentQuery query, Expression<Func<ICypherResultItem, TResult>> expression, string orderBy = null)
+        public static async Task<List<TResult>> ToListAsync<TResult>(this ICypherFluentQuery query, Expression<Func<ICypherResultItem, TResult>> expression, string orderBy = null, int? skip = null, int? limit = null)
         {
             if (orderBy.HasValue())
             {
                 var returnExp = query.Return(expression).OrderBy(orderBy);
+                if (skip.HasValue && limit.HasValue)
+                {
+                    var test = returnExp.Skip(skip.Value).Limit(limit.Value);
+                    return (await test.ResultsAsync).ToList();
+                }
                 return (await returnExp.ResultsAsync).ToList();
             }
             return (await query.Return(expression).ResultsAsync).ToList();
