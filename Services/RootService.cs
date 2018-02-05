@@ -272,16 +272,17 @@ namespace Neo4jClientVector.Core.Services
             {
                 query.Page = query.MaxPage;
             }
+            int? skip = null, limit = null;
             if (false == query.Infinite)
             {
-                var skip = (query.Page - 1) * query.PageRows;
-                records.Skip(skip).Limit(query.PageRows);
+                skip = (query.Page - 1) * query.PageRows;
+                limit = query.PageRows;
             }
             if (selector == null)
             {
                 selector = As<TEntity>(entityKey);
             }
-            query.Results = await records.ToListAsync(selector, orderBy: orderBy.__(x => x.Render()));
+            query.Results = await records.ToListAsync(selector, skip: skip, limit: limit, orderBy: orderBy.__(x => x.Render()));
             stopwatch.Stop();
             query.ElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
             return query.Downcast<TSearch>();
