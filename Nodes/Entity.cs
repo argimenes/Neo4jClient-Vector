@@ -7,6 +7,10 @@ namespace Neo4jClientVector.Nodes
     {
         Guid Guid { get; set; }
     }
+    public interface IDisplayName
+    {
+        string DisplayName { get; }
+    }
     public interface INameable
     {
         string Name { get; set; }
@@ -16,7 +20,7 @@ namespace Neo4jClientVector.Nodes
     {
         public Guid Guid { get; set; }
     }
-    public class Entity : Root, IEntity
+    public class Entity : Root, IEntity, IDisplayName
     {
         public string Name { get; set; }
         /// <summary>
@@ -26,7 +30,13 @@ namespace Neo4jClientVector.Nodes
         public DateTimeOffset DateAddedUTC { get; set; }
         public DateTimeOffset? DateModifiedUTC { get; set; }
         public bool IsDeleted { get; set; }
-
+        public string DisplayName
+        {
+            get
+            {
+                return Name;
+            }
+        }
         public Entity()
         {
             DateAddedUTC = DateTime.UtcNow;

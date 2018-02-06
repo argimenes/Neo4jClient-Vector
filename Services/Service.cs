@@ -16,10 +16,11 @@ using Neo4jClientVector.Helpers;
 using Neo4jClientVector.Attributes;
 using Neo4jClientVector.Constants.Enums;
 using System.Reflection;
+using AutoMapper;
 
 namespace Neo4jClientVector.Core.Services
 {
-    public interface IRootService
+    public interface IService
     {
         Task<Result> DeleteAsync<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, bool replace = false)
             where TRel : Relation, new()
@@ -39,18 +40,90 @@ namespace Neo4jClientVector.Core.Services
         Task<Result> DeleteRelationAsync(Relation relation);
         Task<Result> DeleteRelationAsync<TRel>(Guid guid) where TRel : Relation;
     }
-    public class RootService : IRootService, IDisposable
+    public interface IService<TRoot> : IService where TRoot : Root
+    {
+        Task<TSearch> PageAsync<TSearch>(Search<TRoot> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TRoot>> selector = null, OrderBy orderBy = null, string startNode = "x")
+            where TSearch : Search<TRoot>, new();
+        Task<TRoot> FindAsync(Guid guid);
+        TRoot Find(Guid guid);
+        Task<List<TRoot>> AllAsync(string orderBy = null);
+    }
+    public class Service<TRoot> : Service, IService<TRoot> where TRoot : Root
+    {
+        #region constructor
+        public Service(IGraphDataContext _db) : base(_db)
+        {
+        }
+        #endregion
+
+        public async Task<TSearch> PageAsync<TSearch>(Search<TRoot> query, ICypherFluentQuery records, Expression<Func<ICypherResultItem, TRoot>> selector = null, OrderBy orderBy = null, string startNode = null)
+            where TSearch : Search<TRoot>, new()
+        {
+            return await PageAsync<TRoot, TSearch>(query, records, selector: selector, orderBy: orderBy, entityKey: startNode);
+        }
+
+        public async Task<List<TRoot>> AllAsync(string orderBy = null)
+        {
+            return await AllAsync<TRoot>(orderBy: orderBy);
+        }
+
+        public async Task<TRoot> FindAsync(Guid guid)
+        {
+            return await FindAsync<TRoot>(guid);
+        }
+
+        public TRoot Find(Guid guid)
+        {
+            return Find<TRoot>(guid);
+        }
+
+        protected async Task<Result> SaveVectorAsync<TVector>(TRoot entity, TVector vector)
+            where TVector : Vector
+        {
+            var ident = ToVectorIdent(vector);
+            ident.SourceId = entity.Guid;
+            if (ident.RelationId.HasValue)
+            {
+                await DeleteAsync<TVector>(ident);
+            }
+            return await RelateAsync<TVector>(ident);
+        }
+    }
+
+    public class Service : IService, IDisposable
     {
         #region constructor
         protected readonly ILog Log = LogManager.GetLogger("Default");
         protected readonly ICypherFluentQuery graph;
         protected readonly IGraphDataContext db;
-        public RootService(IGraphDataContext _db)
+        public Service(IGraphDataContext _db)
         {
             db = _db;
             graph = _db.Client.Cypher;
         }
         #endregion
+
+        protected static string Vector<TVector>(string relationKey = null, string from = null, string to = null, string relPath = null, bool sourceLabel = true) where TVector : Vector
+        {
+            return Common.Vector<TVector>(relationKey, from, to, relPath, sourceLabel);
+        }
+
+        protected VectorIdent ToVectorIdent<TVector>(TVector vector)
+            where TVector : Vector
+        {
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<TVector, Vector<Relation, Root, Root>>();
+            });
+            var generic = Mapper.Map<Vector<Relation, Root, Root>>(vector); // vector as Vector<Relation, Entity, Entity>;
+            var ident = new VectorIdent
+            {
+                SourceId = generic.Source.__(x => x.Guid),
+                RelationId = generic.Relation.__(x => x.Guid),
+                TargetId = generic.Target.__(x => x.Guid)
+            };
+            return ident;
+        }
 
         protected string Direction(Search search, string ascending, string descending)
         {
@@ -328,7 +401,7 @@ namespace Neo4jClientVector.Core.Services
             return Expression.Lambda<Func<TTarget, TEntity>>(callee, parameter);
         }
 
-        public async Task<List<T>> AllAsync<T>(string orderBy = null) where T : Entity
+        public async Task<List<T>> AllAsync<T>(string orderBy = null) where T : Root
         {
             return await graph.Match($"(x:{N<T>()})")
                               .ToListAsync(x => x.As<T>(), orderBy);
@@ -435,7 +508,7 @@ namespace Neo4jClientVector.Core.Services
             return await SaveOrUpdateAsync(new TEntity { Guid = guid }, update: update);
         }
 
-        public async Task<Result> SaveOrUpdateAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Root, new()
+        public async Task<Result> SaveOrUpdateAsync<TRoot>(TRoot entity, Action<TRoot> insert = null, Action<TRoot> update = null) where TRoot : Root, new()
         {
             using (var scope = NewScope())
             {
@@ -456,7 +529,7 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        public async Task<Result> SaveOrUpdateInsideScopeAsync<TEntity>(TEntity entity, Action<TEntity> insert = null, Action<TEntity> update = null) where TEntity : Root, new()
+        public async Task<Result> SaveOrUpdateInsideScopeAsync<TRoot>(TRoot entity, Action<TRoot> insert = null, Action<TRoot> update = null) where TRoot : Root, new()
         {
             if (entity.Guid == Guid.Empty)
             {
@@ -472,15 +545,15 @@ namespace Neo4jClientVector.Core.Services
             }
             else
             {
-                var existing = await FindAsync<TEntity>(entity.Guid);
+                var existing = await FindAsync<TRoot>(entity.Guid);
                 if (existing == null)
                 {
-                    return NotFound(new { label = N<TEntity>(), guid = entity.Guid });
+                    return NotFound(new { label = N<TRoot>(), guid = entity.Guid });
                 }
                 if (entity is IDateModifiedUTC)
                 {
                     ((IDateModifiedUTC)existing).DateModifiedUTC = DateTime.UtcNow;
-                }                
+                }
                 if (update != null)
                 {
                     update(existing);
@@ -491,12 +564,12 @@ namespace Neo4jClientVector.Core.Services
             return save;
         }
 
-        public async Task<Result> SaveAsync<TEntity>(TEntity entity) where TEntity : Root
+        public async Task<Result> SaveAsync<TRoot>(TRoot entity) where TRoot : Root
         {
             try
             {
                 var query = graph
-                    .Merge("(e:" + N<TEntity>() + " { Guid: {guid} })")
+                    .Merge("(e:" + N<TRoot>() + " { Guid: {guid} })")
                     .OnCreate().Set("e = {entity}")
                     .OnMatch().Set("e = {entity}")
                     .WithParams(new { guid = entity.Guid, entity });

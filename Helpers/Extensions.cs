@@ -260,14 +260,14 @@ namespace Neo4jClientVector.Helpers
         //    return query;
         //}
 
-        public static ICypherFluentQuery From<TEntity>(this ICypherFluentQuery query, string nodeVar = null) where TEntity : Entity
+        public static ICypherFluentQuery From<TEntity>(this ICypherFluentQuery query, string nodeVar = null) where TEntity : Root
         {
             nodeVar = nodeVar ?? Common.GraphNodeKey<TEntity>();
             query = query.Match($"({nodeVar}:{Common.NodeLabel<TEntity>()})");
             return query;
         }
 
-        public static ICypherFluentQuery From<TEntity>(this ICypherFluentQuery query, Guid guid) where TEntity : Entity
+        public static ICypherFluentQuery From<TEntity>(this ICypherFluentQuery query, Guid guid) where TEntity : Root
         {
             query = query.Match($"({Common.GraphNodeKey<TEntity>()}:{Common.NodeLabel<TEntity>()} {{ Guid: {{guid}} }})").WithParams(new { guid });
             return query;
