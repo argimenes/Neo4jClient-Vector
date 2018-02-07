@@ -19,4 +19,19 @@ namespace Neo4jClientVector.Relationships
         public TSource Source { get; set; }
         public TTarget Target { get; set; }
     }
+
+    public interface IHyperVector<out TLeft, out TRight>
+        where TLeft : Vector
+        where TRight : Vector
+    { }
+
+    public class HyperVector  { }
+
+    public class HyperVector<TLeft, TRight> : HyperVector, IHyperVector<TLeft, TRight>
+        where TLeft : Vector
+        where TRight : Vector
+    {
+        public TLeft Left { get; set; }
+        public TRight Right { get; set; }
+    }
 }

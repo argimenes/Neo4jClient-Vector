@@ -160,6 +160,29 @@ namespace Neo4jClientVector.Core.Services
             return "[ " + pattern + " | { Source: " + SK + ", Relation: " + RK + ", Target: " + TK + " } ]";
         }
 
+        protected static string HyperRows<THyperVector>() where THyperVector : HyperVector
+        {
+            return HyperRows<THyperVector>(null);
+        }
+
+        protected static string HyperRows<THyperVector>(string targetKey) where THyperVector : HyperVector
+        {
+            var genericHyperVectorType = typeof(THyperVector).UnderlyingSystemType.BaseType;
+            var args = genericHyperVectorType.GetTypeInfo().GenericTypeArguments;
+            var leftPattern = Common.PatternInternal(args[0].UnderlyingSystemType, fromLabel: false);
+            var rightPattern = Common.JoinPatternInternal(args[1].UnderlyingSystemType);
+            var pattern = leftPattern + rightPattern;
+            var type = Common.UnpackHyperVector<THyperVector>();
+            var SK1 = type.Item1.Source.NodeKey();
+            var RK1 = type.Item1.Relation.RelationshipKey();
+            var TK1 = targetKey ?? type.Item1.Target.NodeKey();
+            var SK2 = type.Item2.Source.NodeKey();
+            var RK2 = type.Item2.Relation.RelationshipKey();
+            var TK2 = targetKey ?? type.Item2.Target.NodeKey();
+            var rows = "[ " + pattern + " | { Left: { Source: " + SK1 + ", Relation: " + RK1 + ", Target: " + TK1 + " }, Right: { Source: " + SK2 + ", Relation: " + RK2 + ", Target: " + TK2 + " } } ]";
+            return rows;
+        }
+
         protected static string Rows<TVector>(string sourceKey, string targetKey) where TVector : Vector
         {
             var type = Common.Unpack<TVector>();

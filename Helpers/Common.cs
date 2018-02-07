@@ -55,7 +55,7 @@ namespace Neo4jClientVector.Helpers
             return PatternInternal(genericVectorType, rel, from, to, fromLabel: fromLabel);
         }
 
-        private static string PatternInternal(Type vectorType, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true)
+        public static string PatternInternal(Type vectorType, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true)
         {
             relPath = relPath ?? "";
             var type = Unpack(vectorType);
@@ -78,7 +78,7 @@ namespace Neo4jClientVector.Helpers
             return pattern;
         }
 
-        private static string JoinPatternInternal(Type vectorType, string rel = null, string to = null, string relPath = null)
+        public static string JoinPatternInternal(Type vectorType, string rel = null, string to = null, string relPath = null)
         {
             relPath = relPath ?? "";
             var type = Unpack(vectorType);
@@ -182,6 +182,11 @@ namespace Neo4jClientVector.Helpers
             return Memoizer.GetOrSet(() => InternalUnpack(typeof(TVector)), TimeSpan.FromDays(1), typeof(TVector));
         }
 
+        public static Tuple<VectorType, VectorType> UnpackHyperVector<THyperVector>() where THyperVector : HyperVector
+        {
+            return Memoizer.GetOrSet(() => InternalUnpackHyperVector(typeof(THyperVector)), TimeSpan.FromDays(1), typeof(THyperVector));
+        }
+
         /// <summary>
         /// Unpacks the types that are specified by the generic type arguments.
         /// </summary>
@@ -213,6 +218,19 @@ namespace Neo4jClientVector.Helpers
                 Target = args[2]
             };
             return data;
+        }
+
+        public static Tuple<VectorType, VectorType> InternalUnpackHyperVector(Type specificVectorType)
+        {
+            var genericHyperVectorType = specificVectorType.UnderlyingSystemType.BaseType;
+            if (false == genericHyperVectorType.BaseType.IsAssignableFrom(typeof(HyperVector)))
+            {
+                throw new ArgumentException("specificVectorType needs to inherit from HyperVector", "specificVectorType");
+            }
+            var args = genericHyperVectorType.GetTypeInfo().GenericTypeArguments;
+            var left = InternalUnpack(args[0]);
+            var right = InternalUnpack(args[1]);            
+            return new Tuple<VectorType, VectorType>(left, right);
         }
 
         public static string NodeLabel<TEntity>()
