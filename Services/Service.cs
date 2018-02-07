@@ -22,6 +22,7 @@ namespace Neo4jClientVector.Core.Services
 {
     public interface IService
     {
+        Task<THyperVector> FindHyperVectorAsync<THyperVector>(Guid relationId) where THyperVector : HyperVector;
         Task<Result> DeleteAsync<TRel, TSource, TTarget>(Vector<TRel, TSource, TTarget> vector, bool replace = false)
             where TRel : Relation, new()
             where TSource : Root
@@ -646,9 +647,26 @@ namespace Neo4jClientVector.Core.Services
             }
         }
 
-        public async Task<TVector> FindVectorAsync<TVector>(Guid relationId) where TVector : Vector
+        public async Task<THyperVector> FindHyperVectorAsync<THyperVector>(Guid relationId) where THyperVector : HyperVector
         {
-            var vectorType = Common.Unpack<TVector>();
+            var vectorType = Common.UnpackHyperVector<THyperVector>();
+            var leftPattern = PatternPart(vectorType.Item1, Side.Left);
+            var rightPattern = PatternPart(vectorType.Item2, Side.Right);
+            var pattern = leftPattern + rightPattern;
+            var query = graph.Match(pattern).Where((IGuid r1) => r1.Guid == relationId);
+            var result = await query.FirstOrDefaultAsync(() => Return.As<THyperVector>("{ Left: { Source: x1, Relation: r1, Target: y1 }, Right: { Source: y1, Relation: r2, Target: y2 } }"));
+            return result;
+        }
+
+        enum Side
+        {
+            Left,
+            Right
+        }
+
+        string PatternPart(VectorType vectorType, Side side)
+        {
+            var suffix = side == Side.Left ? "1" : "2";
             var R = this.R(vectorType.Relation);
             var S = N(vectorType.Source);
             var T = N(vectorType.Target);
@@ -656,14 +674,23 @@ namespace Neo4jClientVector.Core.Services
             string pattern = "";
             if (relationshipAttribute.Direction == RelationshipDirection.Outgoing)
             {
-                pattern = $"(x:{S})-[r:{R}]->(y:{T})";
+                var source = side == Side.Left ? $"(x{suffix}:{S})-" : "-";
+                pattern = $"{source}[r{suffix}:{R}]->(y{suffix}:{T})";
             }
             else
             {
-                pattern = $"(x:{S})<-[r:{R}]-(y:{T})";
+                var source = side == Side.Left ? $"(x{suffix}:{S})<-" : "-";
+                pattern = $"{source}[r{suffix}:{R}]-(y{suffix}:{T})";
             }
-            var query = graph.Match(pattern).Where((IGuid r) => r.Guid == relationId);
-            var result = await query.FirstOrDefaultAsync(() => Return.As<TVector>("{ Source: x, Relation: r, Target: y }"));
+            return pattern;
+        }
+
+        public async Task<TVector> FindVectorAsync<TVector>(Guid relationId) where TVector : Vector
+        {
+            var vectorType = Common.Unpack<TVector>();
+            var pattern = PatternPart(vectorType, Side.Left);            
+            var query = graph.Match(pattern).Where((IGuid r1) => r1.Guid == relationId);
+            var result = await query.FirstOrDefaultAsync(() => Return.As<TVector>("{ Source: x1, Relation: r1, Target: y1 }"));
             return result;
         }
 
