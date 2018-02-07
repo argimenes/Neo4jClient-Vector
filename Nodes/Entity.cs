@@ -30,7 +30,7 @@ namespace Neo4jClientVector.Nodes
         public DateTimeOffset DateAddedUTC { get; set; }
         public DateTimeOffset? DateModifiedUTC { get; set; }
         public bool IsDeleted { get; set; }
-        public string DisplayName
+        public virtual string DisplayName
         {
             get
             {
