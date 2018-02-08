@@ -163,23 +163,32 @@ namespace Neo4jClientVector.Core.Services
 
         protected static string HyperRows<THyperVector>() where THyperVector : HyperVector
         {
-            return HyperRows<THyperVector>(null);
+            return HyperRows<THyperVector>(null, null);
         }
 
-        protected static string HyperRows<THyperVector>(string targetKey) where THyperVector : HyperVector
+        protected static string HyperRows<THyperVector>(string targetKey2) where THyperVector : HyperVector
+        {
+            return HyperRows<THyperVector>(null, targetKey2);
+        }
+
+        protected static string HyperRows<THyperVector>(string targetKey1, string targetKey2) where THyperVector : HyperVector
         {
             var genericHyperVectorType = typeof(THyperVector).UnderlyingSystemType.BaseType;
             var args = genericHyperVectorType.GetTypeInfo().GenericTypeArguments;
-            var leftPattern = Common.PatternInternal(args[0].UnderlyingSystemType, fromLabel: false);
-            var rightPattern = Common.JoinPatternInternal(args[1].UnderlyingSystemType);
-            var pattern = leftPattern + rightPattern;
             var type = Common.UnpackHyperVector<THyperVector>();
+
             var SK1 = type.Item1.Source.NodeKey();
             var RK1 = type.Item1.Relation.RelationshipKey();
-            var TK1 = targetKey ?? type.Item1.Target.NodeKey();
+            var TK1 = targetKey1 ?? type.Item1.Target.NodeKey();
+            var leftPattern = Common.PatternInternal(args[0].UnderlyingSystemType, fromLabel: false);
+
             var SK2 = type.Item2.Source.NodeKey();
             var RK2 = type.Item2.Relation.RelationshipKey();
-            var TK2 = targetKey ?? type.Item2.Target.NodeKey();
+            var TK2 = targetKey2 ?? type.Item2.Target.NodeKey();
+            var rightPattern = Common.JoinPatternInternal(args[1].UnderlyingSystemType, to: TK2);
+
+            var pattern = leftPattern + rightPattern;
+
             var rows = "[ " + pattern + " | { Left: { Source: " + SK1 + ", Relation: " + RK1 + ", Target: " + TK1 + " }, Right: { Source: " + SK2 + ", Relation: " + RK2 + ", Target: " + TK2 + " } } ]";
             return rows;
         }
@@ -688,7 +697,7 @@ namespace Neo4jClientVector.Core.Services
         public async Task<TVector> FindVectorAsync<TVector>(Guid relationId) where TVector : Vector
         {
             var vectorType = Common.Unpack<TVector>();
-            var pattern = PatternPart(vectorType, Side.Left);            
+            var pattern = PatternPart(vectorType, Side.Left);
             var query = graph.Match(pattern).Where((IGuid r1) => r1.Guid == relationId);
             var result = await query.FirstOrDefaultAsync(() => Return.As<TVector>("{ Source: x1, Relation: r1, Target: y1 }"));
             return result;
