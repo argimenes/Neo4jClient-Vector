@@ -7,9 +7,9 @@ namespace Neo4jClientVector.Contexts
     }
     public class GraphDataContext : IGraphDataContext
     {
-        public GraphClient Client { get; private set; }
+        public IGraphClient Client { get; private set; }
 
-        public GraphDataContext(GraphClient client)
+        public GraphDataContext(IGraphClient client)
         {
             Client = client;
         }
