@@ -8,7 +8,7 @@ namespace Neo4jClientVector.Nodes
 {
     public interface IGuid
     {
-        Guid Guid { get; set; }
+        Guid? Guid { get; set; }
     }
     public interface IName
     {

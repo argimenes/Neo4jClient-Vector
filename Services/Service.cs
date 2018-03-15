@@ -82,7 +82,7 @@ namespace Neo4jClientVector.Core.Services
             where TVector : Vector
         {
             var ident = ToVectorIdent(vector);
-            ident.SourceId = entity.Guid;
+            ident.SourceId = entity.Guid.Value;
             if (ident.RelationId.HasValue)
             {
                 await DeleteAsync<TVector>(ident);
@@ -119,9 +119,9 @@ namespace Neo4jClientVector.Core.Services
             var generic = Mapper.Map<Vector<Relation, Root, Root>>(vector); // vector as Vector<Relation, Entity, Entity>;
             var ident = new VectorIdent
             {
-                SourceId = generic.Source.__(x => x.Guid),
+                SourceId = generic.Source.__(x => x.Guid.Value),
                 RelationId = generic.Relation.__(x => x.Guid),
-                TargetId = generic.Target.__(x => x.Guid)
+                TargetId = generic.Target.__(x => x.Guid.Value)
             };
             return ident;
         }
@@ -451,7 +451,7 @@ namespace Neo4jClientVector.Core.Services
             {
                 try
                 {
-                    if (entity.Guid == Guid.Empty)
+                    if (entity.Guid.GetValueOrDefault() == Guid.Empty)
                     {
                         entity.Guid = Guid.NewGuid();
                         if (insert != null)
@@ -564,7 +564,7 @@ namespace Neo4jClientVector.Core.Services
 
         public async Task<Result> SaveOrUpdateInsideScopeAsync<TRoot>(TRoot entity, Action<TRoot> insert = null, Action<TRoot> update = null) where TRoot : Root, new()
         {
-            if (entity.Guid == Guid.Empty)
+            if (entity.Guid.GetValueOrDefault() == Guid.Empty)
             {
                 entity.Guid = Guid.NewGuid();
                 if (entity is IDateAddedUTC)
@@ -578,7 +578,7 @@ namespace Neo4jClientVector.Core.Services
             }
             else
             {
-                var existing = await FindAsync<TRoot>(entity.Guid);
+                var existing = await FindAsync<TRoot>(entity.Guid.Value);
                 if (existing == null)
                 {
                     return NotFound(new { label = N<TRoot>(), guid = entity.Guid });
@@ -633,11 +633,11 @@ namespace Neo4jClientVector.Core.Services
                     pattern = $"(x:{N<TSource>()})<-[r:{R<TRel>()}]-(y:{N<TTarget>()})";
                 }
                 var query = graph.Match(pattern).Where();
-                if (vector.Source.__(x => x.Guid != Guid.Empty))
+                if (vector.Source.__(x => x.Guid.GetValueOrDefault() != Guid.Empty))
                 {
                     query = query.AndWhere((IGuid x) => x.Guid == vector.Source.Guid);
                 }
-                if (vector.Target.__(x => x.Guid != Guid.Empty))
+                if (vector.Target.__(x => x.Guid.GetValueOrDefault() != Guid.Empty))
                 {
                     query = query.AndWhere((IGuid y) => y.Guid == vector.Target.Guid);
                 }

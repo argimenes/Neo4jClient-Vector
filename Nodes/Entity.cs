@@ -5,7 +5,7 @@ namespace Neo4jClientVector.Nodes
 {
     public interface IIdentifiable
     {
-        Guid Guid { get; set; }
+        Guid? Guid { get; set; }
     }
     public interface IDisplayName
     {
@@ -18,7 +18,7 @@ namespace Neo4jClientVector.Nodes
     [Ident(Property = "Guid")]
     public class Root : IRoot
     {
-        public Guid Guid { get; set; }
+        public Guid? Guid { get; set; }
     }
     public class Entity : Root, IEntity, IDisplayName
     {
