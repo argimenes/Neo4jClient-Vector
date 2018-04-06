@@ -38,8 +38,8 @@
       <HintPath>packages\log4net.2.0.8\lib\net45-full\log4net.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Neo4jClient, Version=3.0.1.9, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\Neo4jClient.3.0.1.9\lib\net452\Neo4jClient.dll</HintPath>
+    <Reference Include="Neo4jClient, Version=3.0.1.10, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\Neo4jClient.3.0.1.10\lib\net452\Neo4jClient.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>packages\Newtonsoft.Json.11.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
