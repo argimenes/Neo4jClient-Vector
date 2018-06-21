@@ -454,7 +454,7 @@ namespace Neo4jClientVector.Helpers
 
         static string PartialMatch(string value)
         {
-            value = value.Trim().Replace("'", "");
+            value = value.Trim().Replace("'", "\\'");
             value = "(?i).*" + value + ".*";
             return value;
         }
