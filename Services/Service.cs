@@ -881,6 +881,14 @@ namespace Neo4jClientVector.Core.Services
         {
             try
             {
+                if (relation == null)
+                {
+                    return Rejected();
+                }
+                if (false == relation.Guid.HasValue)
+                {
+                    return Rejected();
+                }
                 var query = graph.Match("(x)-[r:" + R(relation) + " { Guid: {guid} }]->(y)")
                            .WithParams(new { guid = relation.Guid })
                            .Delete("r");
