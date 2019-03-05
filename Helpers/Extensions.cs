@@ -289,8 +289,15 @@ namespace Neo4jClientVector.Helpers
         /// <param name="relPath"></param>
         /// <param name="to"></param>
         /// <returns></returns>
-        public static ICypherFluentQuery Match<TVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
+        public static ICypherFluentQuery Match<TVector>(this ICypherFluentQuery query, string path = null, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
         {
+            if (path.HasValue())
+            {
+                var parts = path.Split('-');
+                from = Part(parts[0]);
+                rel = Part(parts[1]);
+                to = Part(parts[2]);
+            }
             query = query.Match(Common.Vector<TVector>(rel, from, to, relPath));
             return query;
         }
@@ -336,11 +343,29 @@ namespace Neo4jClientVector.Helpers
         /// <param name="relPath2"></param>
         /// <param name="to2"></param>
         /// <returns></returns>
-        public static ICypherFluentQuery Match<TFirstVector, TSecondVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null, string rel2 = null, string relPath2 = null, string to2 = null) where TFirstVector : Vector where TSecondVector : Vector
+        public static ICypherFluentQuery Match<TFirstVector, TSecondVector>(this ICypherFluentQuery query, string path = null, string from = null, string rel = null, string relPath = null, string to = null, string rel2 = null, string relPath2 = null, string to2 = null) where TFirstVector : Vector where TSecondVector : Vector
         {
+            if (path.HasValue())
+            {
+                var parts = path.Split('-');
+                from = Part(parts[0]);
+                rel = Part(parts[1]);
+                to = Part(parts[2]);
+                if (parts.Length > 3)
+                {
+                    rel2 = Part(parts[3]);
+                    to2 = Part(parts[4]);
+                }
+            }
             var pattern = HyperNodeVector<TFirstVector, TSecondVector>(from, rel, relPath, to, rel2, relPath2, to2);
             query = query.Match(pattern);
             return query;
+        }
+
+        static string Part(string value)
+        {
+            var scrubbed = value.Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "");
+            return scrubbed == "*" ? null : scrubbed;
         }
 
         public static string HyperNodeVector<TFirstVector, TSecondVector>(string from, string rel, string relPath, string to, string rel2, string relPath2, string to2)
@@ -364,8 +389,20 @@ namespace Neo4jClientVector.Helpers
         /// <param name="relPath2"></param>
         /// <param name="to2"></param>
         /// <returns></returns>
-        public static ICypherFluentQuery OptMatch<TFirstVector, TSecondVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null, string rel2 = null, string relPath2 = null, string to2 = null) where TFirstVector : Vector where TSecondVector : Vector
+        public static ICypherFluentQuery OptMatch<TFirstVector, TSecondVector>(this ICypherFluentQuery query, string path = null, string from = null, string rel = null, string relPath = null, string to = null, string rel2 = null, string relPath2 = null, string to2 = null) where TFirstVector : Vector where TSecondVector : Vector
         {
+            if (path.HasValue())
+            {
+                var parts = path.Split('-');
+                from = Part(parts[0]);
+                rel = Part(parts[1]);
+                to = Part(parts[2]);
+                if (parts.Length > 3)
+                {
+                    rel2 = Part(parts[3]);
+                    to2 = Part(parts[4]);
+                }
+            }
             var pattern = HyperNodeVector<TFirstVector, TSecondVector>(from, rel, relPath, to, rel2, relPath2, to2);
             query = query.OptionalMatch(pattern);
             return query;
@@ -381,8 +418,15 @@ namespace Neo4jClientVector.Helpers
         /// <param name="relPath"></param>
         /// <param name="to"></param>
         /// <returns></returns>
-        public static ICypherFluentQuery OptMatch<TVector>(this ICypherFluentQuery query, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
+        public static ICypherFluentQuery OptMatch<TVector>(this ICypherFluentQuery query, string path = null, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
         {
+            if (path.HasValue())
+            {
+                var parts = path.Split('-');
+                from = Part(parts[0]);
+                rel = Part(parts[1]);
+                to = Part(parts[2]);                
+            }
             var pattern = Common.Vector<TVector>(rel, from, to, relPath);
             query = query.OptionalMatch(pattern);
             return query;
