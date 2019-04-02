@@ -228,6 +228,36 @@ namespace Neo4jClientVector.Core.Services
             return "{ Relation: " + RK + ", Target: " + TK + " }";
         }
 
+        /// <summary>
+        /// (Source)-[:Relation]-(Target)
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static string Record(string path)
+        {
+            var vars = ICypherFluentQueryExtensions.ProcessVars(path);
+            if (vars.Unsuccessful())
+            {
+                return null;
+            }
+            var parts = vars.Data;
+            var list = new List<string>();
+            if (parts.From.HasValue())
+            {
+                list.Add("Source: " + parts.From);
+            }
+            if (parts.Rel.HasValue())
+            {
+                list.Add("Relation: " + parts.Rel);
+            }
+            if (parts.To.HasValue())
+            {
+                list.Add("Target: " + parts.To);
+            }
+            var map = "{ " + string.Join(", ", list) + " }";
+            return map;
+        }
+
         protected static string Edge<TVector>() where TVector : Vector
         {
             return Edge<TVector>(null);

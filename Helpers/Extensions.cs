@@ -1,6 +1,7 @@
 ﻿using Neo4jClient;
 using Neo4jClient.Cypher;
 using Neo4jClientVector.Attributes;
+using Neo4jClientVector.Models;
 using Neo4jClientVector.Nodes;
 using Neo4jClientVector.Relationships;
 using System;
@@ -166,9 +167,18 @@ namespace Neo4jClientVector.Helpers
         /// <param name="relPath"></param>
         /// <param name="fromLabel"></param>
         /// <returns></returns>
-        public static ICypherFluentQuery Path<TVector>(this ICypherFluentQuery query, string path = null, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true) where TVector : Vector
+        public static ICypherFluentQuery Path<TVector>(this ICypherFluentQuery query, string path = null, string pathPattern = null, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true) where TVector : Vector
         {
             path = path ?? "p";
+            var vars = ProcessVars(pathPattern);
+            if (vars.Successful())
+            {
+                var result = vars.Data;
+                from = result.From;
+                rel = result.Rel;
+                relPath = result.RelPath;
+                to = result.To;
+            }
             var pattern = $"{path}=" + Common.Vector<TVector>(rel, from, to, relPath, fromLabel);
             query = query.Match(pattern);
             return query;
@@ -191,11 +201,23 @@ namespace Neo4jClientVector.Helpers
         /// <param name="relPath2"></param>
         /// <returns></returns>
         public static ICypherFluentQuery Path<TFirstVector, TSecondVector>(this ICypherFluentQuery query,
-            string path = null, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true, string to2 = null, string rel2 = null, string relPath2 = null)
+            string path = null, string pathPattern = null, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true, string to2 = null, string rel2 = null, string relPath2 = null)
             where TFirstVector : Vector
             where TSecondVector : Vector
         {
             path = path ?? "p";
+            var vars = ProcessVars(pathPattern);
+            if (vars.Successful())
+            {
+                var result = vars.Data;
+                from = result.From;
+                rel = result.Rel;
+                relPath = result.RelPath;
+                to = result.To;
+                rel2 = result.Rel2;
+                relPath2 = result.RelPath2;
+                to2 = result.To2;
+            }
             var pattern = $"{path}=" + Common.Vector<TFirstVector>(rel, from, to, relPath, fromLabel).Join<TSecondVector>(rel: rel2, to: to2, relPath: relPath2);
             query = query.Match(pattern);
             return query;
@@ -273,6 +295,12 @@ namespace Neo4jClientVector.Helpers
             return query;
         }
 
+        public static ICypherFluentQuery From<TEntity>(this ICypherFluentQuery query, string nodeVar, Guid guid) where TEntity : Root
+        {
+            query = query.Match("(" + nodeVar + ":" + Common.NodeLabel<TEntity>() + " { Guid: {" + nodeVar + "Guid} })").WithParam(nodeVar + "Guid", guid);
+            return query;
+        }
+
         public static ICypherFluentQuery OptMatch<TVector>(this ICypherFluentQuery query) where TVector : Vector
         {
             query = query.OptionalMatch(Common.Vector<TVector>());
@@ -291,14 +319,35 @@ namespace Neo4jClientVector.Helpers
         /// <returns></returns>
         public static ICypherFluentQuery Match<TVector>(this ICypherFluentQuery query, string path = null, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
         {
-            if (path.HasValue())
+            var vars = ProcessVars(path);
+            if (vars.Successful())
             {
-                var parts = path.Split('-');
-                from = Part(parts[0]);
-                rel = Part(parts[1]);
-                to = Part(parts[2]);
+                var result = vars.Data;
+                from = result.From;
+                rel = result.Rel;
+                relPath = result.RelPath;
+                to = result.To;
             }
             query = query.Match(Common.Vector<TVector>(rel, from, to, relPath));
+            return query;
+        }
+
+        public static ICypherFluentQuery Merge<TVector>(this ICypherFluentQuery query, string path = null) where TVector : Vector
+        {
+            string from = null;
+            string rel = null;
+            string relPath = null;
+            string to = null;
+            var vars = ProcessVars(path);
+            if (vars.Successful())
+            {
+                var result = vars.Data;
+                from = result.From;
+                rel = result.Rel;
+                relPath = result.RelPath;
+                to = result.To;
+            }
+            query = query.Merge(Common.Vector<TVector>(rel, from, to, relPath, fromLabel: false, toLabel: false));
             return query;
         }
 
@@ -345,27 +394,49 @@ namespace Neo4jClientVector.Helpers
         /// <returns></returns>
         public static ICypherFluentQuery Match<TFirstVector, TSecondVector>(this ICypherFluentQuery query, string path = null, string from = null, string rel = null, string relPath = null, string to = null, string rel2 = null, string relPath2 = null, string to2 = null) where TFirstVector : Vector where TSecondVector : Vector
         {
-            if (path.HasValue())
+            var vars = ProcessVars(path);
+            if (vars.Successful())
             {
-                var parts = path.Split('-');
-                from = Part(parts[0]);
-                rel = Part(parts[1]);
-                to = Part(parts[2]);
-                if (parts.Length > 3)
-                {
-                    rel2 = Part(parts[3]);
-                    to2 = Part(parts[4]);
-                }
+                var result = vars.Data;
+                from = result.From;
+                rel = result.Rel;
+                relPath = result.RelPath;
+                to = result.To;
+                rel2 = result.Rel2;
+                relPath2 = result.RelPath2;
+                to2 = result.To2;
             }
             var pattern = HyperNodeVector<TFirstVector, TSecondVector>(from, rel, relPath, to, rel2, relPath2, to2);
             query = query.Match(pattern);
             return query;
         }
 
+        static string VarPart(string relPath)
+        {
+            var parts = relPath.Replace("[", "").Replace("]", "").Split(':');
+            if (parts.Length < 2)
+            {
+                return null;
+            }
+            return parts[1];
+        }
+
         static string Part(string value)
         {
+            if (value.Contains(":"))
+            {
+                value = value.Split(':')[0];
+            }
             var scrubbed = value.Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "");
-            return scrubbed == "*" ? null : scrubbed;
+            if (scrubbed == "")
+            {
+                return "";
+            }
+            if (scrubbed == "_")
+            {
+                return null;
+            }
+            return scrubbed;
         }
 
         public static string HyperNodeVector<TFirstVector, TSecondVector>(string from, string rel, string relPath, string to, string rel2, string relPath2, string to2)
@@ -396,10 +467,12 @@ namespace Neo4jClientVector.Helpers
                 var parts = path.Split('-');
                 from = Part(parts[0]);
                 rel = Part(parts[1]);
+                relPath = VarPart(parts[1]);
                 to = Part(parts[2]);
                 if (parts.Length > 3)
                 {
                     rel2 = Part(parts[3]);
+                    relPath2 = VarPart(parts[3]);
                     to2 = Part(parts[4]);
                 }
             }
@@ -420,16 +493,69 @@ namespace Neo4jClientVector.Helpers
         /// <returns></returns>
         public static ICypherFluentQuery OptMatch<TVector>(this ICypherFluentQuery query, string path = null, string from = null, string rel = null, string relPath = null, string to = null) where TVector : Vector
         {
-            if (path.HasValue())
+            var vars = ProcessVars(path);
+            if (vars.Successful())
             {
-                var parts = path.Split('-');
-                from = Part(parts[0]);
-                rel = Part(parts[1]);
-                to = Part(parts[2]);                
+                var result = vars.Data;
+                from = result.From;
+                rel = result.Rel;
+                relPath = result.RelPath;
+                to = result.To;
             }
             var pattern = Common.Vector<TVector>(rel, from, to, relPath);
             query = query.OptionalMatch(pattern);
             return query;
+        }
+
+        public static Result<VectorVars> ProcessVars(string path)
+        {
+            var ignore = Result.Rejected<VectorVars>();
+            if (false == path.HasValue())
+            {
+                return ignore;
+            }
+            var parts = path.Split('-');
+            if (parts.Length == 0)
+            {
+                return ignore;
+            }
+            var vars = new VectorVars { };
+            if (parts.Length == 1)
+            {
+                if (path.StartsWith("-"))
+                {
+                    vars.To = Part(parts[0]);
+                }
+                else if (path.EndsWith("-"))
+                {
+                    vars.From = Part(parts[0]);
+                }
+            }
+            else
+            {
+                vars.From = Part(parts[0]);
+                vars.Rel = Part(parts[1]);
+                vars.RelPath = VarPart(parts[1]);
+                vars.To = Part(parts[2]);
+                if (parts.Length > 3)
+                {
+                    vars.Rel2 = Part(parts[3]);
+                    vars.RelPath2 = VarPart(parts[3]);
+                    vars.To2 = Part(parts[4]);
+                }
+            }
+            return Result.Success(vars);
+        }
+
+        public class VectorVars
+        {
+            public string From { get; set; }
+            public string Rel { get; set; }
+            public string RelPath { get; set; }
+            public string To { get; set; }
+            public string Rel2 { get; set; }
+            public string RelPath2 { get; set; }
+            public string To2 { get; set; }
         }
 
         /// <summary>

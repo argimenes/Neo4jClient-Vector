@@ -31,9 +31,9 @@ namespace Neo4jClientVector.Helpers
             return Attribute<RelationshipAttribute>(relationType).Type;
         }
 
-        public static string Vector<TVector>(string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true) where TVector : Vector
+        public static string Vector<TVector>(string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true, bool toLabel = true) where TVector : Vector
         {
-            return PatternInternal(typeof(TVector), rel, from, to, relPath, fromLabel: fromLabel);
+            return PatternInternal(typeof(TVector), rel, from, to, relPath, fromLabel: fromLabel, toLabel: toLabel);
         }
 
         public static string JoinVector<TVector>(string rel = null, string to = null, string relPath = null) where TVector : Vector
@@ -55,25 +55,25 @@ namespace Neo4jClientVector.Helpers
             return PatternInternal(genericVectorType, rel, from, to, fromLabel: fromLabel);
         }
 
-        public static string PatternInternal(Type vectorType, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true)
+        public static string PatternInternal(Type vectorType, string rel = null, string from = null, string to = null, string relPath = null, bool fromLabel = true, bool toLabel = true)
         {
             relPath = relPath ?? "";
             var type = Unpack(vectorType);
             var relationAttribute = Attribute<RelationshipAttribute>(type.Relation);
             var RType = GraphRelationshipName(type.Relation);
             var SLabel = fromLabel ? ":" + type.Source.Label() : "";
-            var TLabel = type.Target.Label();
+            var TLabel = toLabel ? ":" + type.Target.Label() : "";
             var RKey = rel ?? RelationshipKey(type.Relation);
             var SKey = from ?? SourceNodeKey(type.Source);
             var TKey = to ?? TargetNodeKey(type.Target);
             var pattern = "";
             if (relationAttribute.Direction == RelationshipDirection.Outgoing)
             {
-                pattern = $"({SKey}{SLabel})-[{RKey}:{RType}{relPath}]->({TKey}:{TLabel})";
+                pattern = $"({SKey}{SLabel})-[{RKey}:{RType}{relPath}]->({TKey}{TLabel})";
             }
             else
             {
-                pattern = $"({SKey}{SLabel})<-[{RKey}:{RType}{relPath}]-({TKey}:{TLabel})";
+                pattern = $"({SKey}{SLabel})<-[{RKey}:{RType}{relPath}]-({TKey}{TLabel})";
             }
             return pattern;
         }
