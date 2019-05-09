@@ -411,6 +411,24 @@ namespace Neo4jClientVector.Helpers
             return query;
         }
 
+        public static ICypherFluentQuery Match<TFirstVector, TSecondVector, TThirdVector>(this ICypherFluentQuery query, string path)
+            where TFirstVector : Vector
+            where TSecondVector : Vector
+            where TThirdVector : Vector
+        {
+            var vars = ProcessVars(path);
+            if (vars.Unsuccessful())
+            {
+                throw new InvalidOperationException();
+                // return query;
+            }
+            var first = Common.Vector<TFirstVector>(vars.Data.Rel, vars.Data.From, vars.Data.To, vars.Data.RelPath);
+            var second = Common.JoinVector<TSecondVector>(vars.Data.Rel2, vars.Data.RelPath2, vars.Data.To2);
+            var third = Common.JoinVector<TThirdVector>(vars.Data.Rel3, vars.Data.RelPath3, vars.Data.To3);
+            query = query.Match(first + second + third);
+            return query;
+        }
+
         static string VarPart(string relPath)
         {
             var parts = relPath.Replace("[", "").Replace("]", "").Split(':');
@@ -462,19 +480,17 @@ namespace Neo4jClientVector.Helpers
         /// <returns></returns>
         public static ICypherFluentQuery OptMatch<TFirstVector, TSecondVector>(this ICypherFluentQuery query, string path = null, string from = null, string rel = null, string relPath = null, string to = null, string rel2 = null, string relPath2 = null, string to2 = null) where TFirstVector : Vector where TSecondVector : Vector
         {
-            if (path.HasValue())
+            var vars = ProcessVars(path);
+            if (vars.Successful())
             {
-                var parts = path.Split('-');
-                from = Part(parts[0]);
-                rel = Part(parts[1]);
-                relPath = VarPart(parts[1]);
-                to = Part(parts[2]);
-                if (parts.Length > 3)
-                {
-                    rel2 = Part(parts[3]);
-                    relPath2 = VarPart(parts[3]);
-                    to2 = Part(parts[4]);
-                }
+                var result = vars.Data;
+                from = result.From;
+                rel = result.Rel;
+                relPath = result.RelPath;
+                to = result.To;
+                rel2 = result.Rel2;
+                relPath2 = result.RelPath2;
+                to2 = result.To2;
             }
             var pattern = HyperNodeVector<TFirstVector, TSecondVector>(from, rel, relPath, to, rel2, relPath2, to2);
             query = query.OptionalMatch(pattern);
@@ -509,6 +525,7 @@ namespace Neo4jClientVector.Helpers
 
         public static Result<VectorVars> ProcessVars(string path)
         {
+            var vars = new VectorVars { };
             var ignore = Result.Rejected<VectorVars>();
             if (false == path.HasValue())
             {
@@ -519,7 +536,27 @@ namespace Neo4jClientVector.Helpers
             {
                 return ignore;
             }
-            var vars = new VectorVars { };
+            if (false == parts.Any(x => x.StartsWith("[")))
+            {
+                var len = parts.Length;
+                if (len >= 2)
+                {
+                    vars.From = Part(parts[0]);
+                    vars.Rel = "";
+                    vars.To = Part(parts[1]);
+                }
+                if (len >= 3)
+                {
+                    vars.Rel2 = "";
+                    vars.To2 = Part(parts[2]);
+                }
+                if (len >= 4)
+                {
+                    vars.Rel3 = "";
+                    vars.To3 = Part(parts[3]);
+                }
+                return Result.Success(vars);
+            }
             if (parts.Length == 1)
             {
                 if (path.StartsWith("-"))
@@ -543,6 +580,12 @@ namespace Neo4jClientVector.Helpers
                     vars.RelPath2 = VarPart(parts[3]);
                     vars.To2 = Part(parts[4]);
                 }
+                if (parts.Length > 5)
+                {
+                    vars.Rel3 = Part(parts[5]);
+                    vars.RelPath3 = VarPart(parts[5]);
+                    vars.To3 = Part(parts[6]);
+                }
             }
             return Result.Success(vars);
         }
@@ -556,6 +599,19 @@ namespace Neo4jClientVector.Helpers
             public string Rel2 { get; set; }
             public string RelPath2 { get; set; }
             public string To2 { get; set; }
+            public string Rel3 { get; set; }
+            public string RelPath3 { get; set; }
+            public string To3 { get; set; }
+
+            public List<VectorPart> Parts = new List<VectorPart>();
+        }
+
+        public class VectorPart
+        {
+            public string From { get; set; }
+            public string Rel { get; set; }
+            public string RelPath { get; set; }
+            public string To { get; set; }
         }
 
         /// <summary>
